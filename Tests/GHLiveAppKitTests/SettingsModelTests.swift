@@ -118,6 +118,14 @@ struct SettingsModelTests {
         #expect(store.saved.isEmpty)
     }
 
+    @Test func confirmingAPresetStopsRecording() {
+        let (model, _) = make()
+        model.toggleRecording(.black1)
+        model.requestPreset(.fiveFret)
+        model.confirmPreset()
+        #expect(model.recordingControl == nil)
+    }
+
     @Test func cancellingThePresetKeepsTheKeys() {
         let (model, store) = make()
         model.requestPreset(.fiveFret)
