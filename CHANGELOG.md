@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-10-05
+
+### Fixed
+
+- The menu now shrinks when a card disappears (for example after granting Accessibility) instead of leaving blank space.
+
 ### Added
 
 - A "5-fret (classic charts)" keymap preset next to the default 6-fret one, so the guitar can play classic five-lane charts with keys 1-5. Settings shows which preset is active (or "Custom keys"), and `ghlive keymap --print-preset five-fret|six-fret` prints either as JSON.
