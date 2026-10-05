@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "GHLiveCore", targets: ["GHLiveCore"]),
         .executable(name: "ghlive", targets: ["ghlive"]),
+        .executable(name: "GHLiveApp", targets: ["GHLiveApp"]),
     ],
     targets: [
         .target(name: "GIPProtocol"),
@@ -23,6 +24,11 @@ let package = Package(
             dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
         .executableTarget(name: "ghlive", dependencies: ["GHLiveCLI"]),
+        .target(
+            name: "GHLiveAppKit",
+            dependencies: ["GHLiveCore", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
+        ),
+        .executableTarget(name: "GHLiveApp", dependencies: ["GHLiveAppKit"]),
         .testTarget(name: "GIPProtocolTests", dependencies: ["GIPProtocol"]),
         .testTarget(name: "GuitarInputTests", dependencies: ["GuitarInput"]),
         .testTarget(name: "KeyMappingTests", dependencies: ["KeyMapping", "GuitarInput"]),
@@ -33,5 +39,9 @@ let package = Package(
         ),
         .testTarget(name: "USBTransportTests", dependencies: ["USBTransport"]),
         .testTarget(name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput"]),
+        .testTarget(
+            name: "GHLiveAppKitTests",
+            dependencies: ["GHLiveAppKit", "GHLiveCore", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
+        ),
     ]
 )
