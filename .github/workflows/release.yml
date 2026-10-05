@@ -10,26 +10,28 @@ on:
   push:
     tags: ["v*"]
 
+# Both triggers resolve to the tag name, so a dispatch and a tag push for one version serialise.
 concurrency:
-  group: release-${{ inputs.version || github.ref_name }}
+  group: release-${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
-  release:
-    name: Test, build, attest and publish
+  build:
+    name: Test and build
     # Manual releases come from main only; tag pushes are gated by who can push tags.
     if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: macos-15
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     env:
       INPUT_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-tags: true
           persist-credentials: false
 
       - name: Resolve and check the version
@@ -58,22 +60,52 @@ jobs:
       - name: Build the app and the CLI
         run: scripts/build-app.sh
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Attest and publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      PRERELEASE: ${{ needs.build.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist
+
       - name: Attest the app and the CLI
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/GHLive-${{ steps.version.outputs.version }}-macos-universal.zip
-            dist/ghlive-${{ steps.version.outputs.version }}-macos-universal.tar.gz
+            dist/GHLive-${{ needs.build.outputs.version }}-macos-universal.zip
+            dist/ghlive-${{ needs.build.outputs.version }}-macos-universal.tar.gz
 
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          VERSION: ${{ steps.version.outputs.version }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           tag="v${VERSION}"
-          # A tag that already exists must point at the commit that was just built and attested.
+          # A tag that already exists must point at the commit that was built and attested.
           if tag_commit="$(git rev-parse --verify --quiet "refs/tags/${tag}^{commit}")"; then
             if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
               echo "::error::Tag ${tag} points at ${tag_commit}, not at the built commit ${GITHUB_SHA}. Refusing to publish."

@@ -14,7 +14,8 @@ APP="$DIST/GHLive.app"
 APP_ZIP="GHLive-${VERSION}-macos-universal.zip"
 CLI_TARBALL="ghlive-${VERSION}-macos-universal.tar.gz"
 EXPECTED_ARCHS="x86_64 arm64"
-# Apple wants a numeric CFBundleShortVersionString, so a prerelease keeps its suffix only in CFBundleVersion.
+# CFBundleShortVersionString must be numeric, so a prerelease keeps its suffix only in CFBundleVersion, which
+# stays distinct between 0.1.0-beta.1 and 0.1.0. Non-App-Store bundles tolerate that format.
 SHORT_VERSION="${VERSION%%-*}"
 
 verify_universal() {
