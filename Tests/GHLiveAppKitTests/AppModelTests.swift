@@ -7,7 +7,8 @@ import Testing
 @testable import GHLiveAppKit
 
 private let pollInterval: Duration = .milliseconds(10)
-private let patience: Duration = .seconds(3)
+// Generous on purpose: waits end as soon as the condition holds, and CI runners can stall the main actor for seconds.
+private let patience: Duration = .seconds(30)
 
 @MainActor
 private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
