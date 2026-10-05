@@ -20,6 +20,16 @@ python3 -m venv .venv
 
 It only reads descriptors; it never configures or claims the device.
 
+## Handshake
+
+```sh
+.venv/bin/python handshake.py --seconds 10
+```
+
+Configures the dongle, powers it on over GIP and logs every packet. `--seconds` limits the run (default 60, 0 runs until Ctrl-C). `--show-repeats` prints every guitar input report instead of only the ones that changed.
+
+It holds the device exclusively: quit apps that may have it open (Steam, Plex, browser tabs using WebUSB) first.
+
 ## Lint and tests
 
 ```sh
