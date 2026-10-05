@@ -133,6 +133,18 @@ struct SettingsModelTests {
         #expect(model.hysteresisNote == SettingsModel.hysteresisNoteText)
     }
 
+    @Test func aBandEqualToItsThresholdIsLoweredBelowIt() throws {
+        let (model, store) = make()
+        model.tilt = Double(Thresholds.defaultTiltHysteresis)
+        model.whammy = Thresholds.defaultWhammyHysteresis
+        model.commit()
+        #expect(model.message == .saved)
+        let saved = try #require(store.saved.last)
+        #expect(saved.thresholds.tiltHysteresis < saved.thresholds.tilt)
+        #expect(saved.thresholds.whammyHysteresis < saved.thresholds.whammy)
+        #expect(model.hysteresisNote == SettingsModel.hysteresisNoteText)
+    }
+
     @Test func movingBackRestoresTheOriginalBandAndDropsTheNote() throws {
         let (model, store) = make()
         model.tilt = 5

@@ -58,6 +58,7 @@ public final class AppModel: ObservableObject {
     private let openURL: (URL) -> Void
     private let pollInterval: Duration
     private var pollTask: Task<Void, Never>?
+    private var pendingTermination: PendingTermination?
     private var subscriptions: Set<AnyCancellable> = []
 
     private var statusPresentation: StatusPresentation
@@ -173,7 +174,8 @@ public final class AppModel: ObservableObject {
     }
 
     /// Answers the system's "may I quit?" question: `reply` runs once the keys are released, or after
-    /// `timeout` if stopping hangs, so a stuck dongle can never keep the app from quitting.
+    /// `timeout` if stopping hangs, so a stuck dongle can never keep the app from quitting. Asking again
+    /// while a termination is pending joins it.
     public func terminate(timeout: Duration = AppModel.terminationTimeout, reply: @escaping @MainActor () -> Void) {
         terminate(shutdown: { await self.shutdown() }, timeout: timeout, reply: reply)
     }
@@ -181,14 +183,22 @@ public final class AppModel: ObservableObject {
     func terminate(
         shutdown: @escaping @MainActor () async -> Void, timeout: Duration, reply: @escaping @MainActor () -> Void
     ) {
-        let once = ReplyOnce(reply)
+        if let pending = pendingTermination {
+            pending.add(reply)
+            return
+        }
+        let pending = PendingTermination()
+        pending.add(reply)
+        pendingTermination = pending
+        // Released before anything can hang, so even a timed-out quit leaves no key held.
+        driver.pause()
         Task {
             await shutdown()
-            once.send()
+            pending.finish()
         }
         Task {
             try? await Task.sleep(for: timeout)
-            once.send()
+            pending.finish()
         }
     }
 
@@ -267,17 +277,26 @@ public final class AppModel: ObservableObject {
     }
 }
 
+/// The replies waiting for a termination to finish; each runs exactly once.
 @MainActor
-private final class ReplyOnce {
-    private var reply: (@MainActor () -> Void)?
+private final class PendingTermination {
+    private var replies: [@MainActor () -> Void] = []
+    private var isFinished = false
 
-    init(_ reply: @escaping @MainActor () -> Void) {
-        self.reply = reply
+    func add(_ reply: @escaping @MainActor () -> Void) {
+        if isFinished {
+            reply()
+        } else {
+            replies.append(reply)
+        }
     }
 
-    func send() {
-        reply?()
-        reply = nil
+    func finish() {
+        guard !isFinished else { return }
+        isFinished = true
+        let waiting = replies
+        replies = []
+        for reply in waiting { reply() }
     }
 }
 

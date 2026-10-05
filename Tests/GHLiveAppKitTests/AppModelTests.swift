@@ -38,6 +38,16 @@ struct AppModelTests {
         #expect(fixture.model.monitor.status == fixture.model.menu.status)
     }
 
+    @Test func anUnchangedMenuIsNotRepublished() {
+        let fixture = AppFixture()
+        fixture.model.setLaunchAtLogin(true)
+        var changes = 0
+        let subscription = fixture.model.objectWillChange.sink { changes += 1 }
+        fixture.model.setLaunchAtLogin(true)
+        #expect(changes == 0)
+        subscription.cancel()
+    }
+
     @Test func theMenuOnlyPublishesWhenItChanges() {
         let fixture = AppFixture()
         var changes = 0
@@ -201,14 +211,49 @@ struct AppModelTests {
         #expect((releasesAtReply ?? 0) >= 1)
     }
 
-    @Test func terminateGivesUpWhenStoppingHangs() async throws {
+    @Test func terminateGivesUpWhenStoppingHangsButKeysAreAlreadyReleased() async throws {
         let fixture = AppFixture()
         var replies = 0
+        var releasesAtReply = 0
         let hungForever: @MainActor () async -> Void = { try? await Task.sleep(for: .seconds(30)) }
-        fixture.model.terminate(shutdown: hungForever, timeout: .milliseconds(50)) { replies += 1 }
+        fixture.model.terminate(shutdown: hungForever, timeout: .milliseconds(50)) {
+            replies += 1
+            releasesAtReply = fixture.sink.releaseCount
+        }
         #expect(replies == 0)
         try await waitUntil { replies > 0 }
         #expect(replies == 1)
+        #expect(releasesAtReply >= 1)
+    }
+
+    @Test func concurrentTerminatesJoinOneShutdown() async throws {
+        let fixture = AppFixture()
+        var shutdowns = 0
+        var releasesAtReply: [Int] = []
+        let counting: @MainActor () async -> Void = {
+            shutdowns += 1
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        for _ in 0..<2 {
+            fixture.model.terminate(shutdown: counting, timeout: .seconds(30)) {
+                releasesAtReply.append(fixture.sink.releaseCount)
+            }
+        }
+        #expect(releasesAtReply.isEmpty)
+        try await waitUntil { releasesAtReply.count == 2 }
+        #expect(shutdowns == 1)
+        #expect(releasesAtReply.count == 2)
+        #expect(releasesAtReply.allSatisfy { $0 >= 1 })
+    }
+
+    @Test func aTerminateAfterTheLastOneRepliesAtOnce() async throws {
+        let fixture = AppFixture()
+        let instant: @MainActor () async -> Void = {}
+        var replies = 0
+        fixture.model.terminate(shutdown: instant, timeout: .seconds(30)) { replies += 1 }
+        try await waitUntil { replies == 1 }
+        fixture.model.terminate(shutdown: instant, timeout: .seconds(30)) { replies += 1 }
+        #expect(replies == 2)
     }
 
     @Test func terminateRepliesOnlyOnce() async throws {
