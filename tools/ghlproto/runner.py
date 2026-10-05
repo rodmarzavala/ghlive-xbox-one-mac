@@ -6,6 +6,8 @@ from ghlproto.packet_log import PacketLogger
 from ghlproto.session import GipSession
 from ghlproto.transport import PacketTransport
 
+PacketHandler = Callable[[GipPacket], None]
+
 READ_TIMEOUT_MS = 100
 RUN_FOREVER = 0.0
 
@@ -21,6 +23,7 @@ def run_session(
     logger: PacketLogger,
     seconds: float,
     clock: Callable[[], float] = time.monotonic,
+    on_packet: PacketHandler | None = None,
 ) -> None:
     session = GipSession()
     deadline = clock() + seconds if seconds > RUN_FOREVER else float("inf")
@@ -33,17 +36,23 @@ def run_session(
         try:
             packets = decode_packets(data)
         except GipTransferError as error:
-            handle_packets(session, transport, logger, error.packets)
+            handle_packets(session, transport, logger, error.packets, on_packet)
             logger.undecodable(error.tail, error.reason)
             continue
-        handle_packets(session, transport, logger, packets)
+        handle_packets(session, transport, logger, packets, on_packet)
 
 
 def handle_packets(
-    session: GipSession, transport: PacketTransport, logger: PacketLogger, packets: list[GipPacket]
+    session: GipSession,
+    transport: PacketTransport,
+    logger: PacketLogger,
+    packets: list[GipPacket],
+    on_packet: PacketHandler | None,
 ) -> None:
     for packet in packets:
         logger.received(packet)
+        if on_packet:
+            on_packet(packet)
         reason = session.unsupported_reason(packet)
         if reason:
             logger.note(reason)
