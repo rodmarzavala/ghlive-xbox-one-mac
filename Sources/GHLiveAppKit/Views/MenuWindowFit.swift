@@ -22,8 +22,9 @@ enum MenuWindowFit {
 private struct ContentHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
+    // Last-wins would keep the default 0 from sibling views; the tallest report is the content's.
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+        value = max(value, nextValue())
     }
 }
 
@@ -53,8 +54,16 @@ private struct HostingWindowReader: NSViewRepresentable {
     }
 }
 
+@MainActor
 private final class WindowBox: ObservableObject {
     weak var window: NSWindow?
+
+    func fit(to contentHeight: CGFloat) {
+        guard let window else { return }
+        let currentContent = window.contentRect(forFrameRect: window.frame)
+        guard let fittedContent = MenuWindowFit.frame(fitting: contentHeight, in: currentContent) else { return }
+        window.setFrame(window.frameRect(forContentRect: fittedContent), display: true)
+    }
 }
 
 private struct FitsMenuWindowToContent: ViewModifier {
@@ -62,18 +71,18 @@ private struct FitsMenuWindowToContent: ViewModifier {
     @StateObject private var box = WindowBox()
 
     func body(content: Content) -> some View {
-        content
+        let box = box
+        return
+            content
             .background(
                 GeometryReader { proxy in
                     Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
                 }
             )
             .background(HostingWindowReader { box.window = $0 })
+            // Older SDKs declare this action @Sendable; it always runs on the main thread.
             .onPreferenceChange(ContentHeightKey.self) { height in
-                guard let window = box.window else { return }
-                let currentContent = window.contentRect(forFrameRect: window.frame)
-                guard let fittedContent = MenuWindowFit.frame(fitting: height, in: currentContent) else { return }
-                window.setFrame(window.frameRect(forContentRect: fittedContent), display: true)
+                MainActor.assumeIsolated { box.fit(to: height) }
             }
     }
 }
