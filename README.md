@@ -4,7 +4,7 @@ Use the **Guitar Hero Live guitar with its Xbox One USB dongle on macOS**, for g
 
 macOS ships no driver for this dongle: it stays unconfigured and its LED never turns on. This project is a userspace driver that talks to the dongle directly over USB using Microsoft's Gaming Input Protocol (GIP). No kernel extensions, no SIP changes, no signed drivers.
 
-> **Status: early development.** USB discovery works. The GIP handshake, input parsing and keyboard output are in progress. See the [roadmap](#roadmap).
+> **Status: early development.** Discovery, the GIP handshake and keyboard output work in the Python prototype (`tools/play.py`). See the [roadmap](#roadmap).
 
 ## Supported hardware
 
@@ -26,12 +26,31 @@ Only the **Xbox One** dongle is supported. The PS3, Wii U and PS4 dongles are st
 
 Protocol details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 
+## Playing Clone Hero
+
+1. Install the dependencies and run the player (details in [tools/README.md](tools/README.md#play)):
+   ```sh
+   cd tools
+   .venv/bin/pip install -r requirements.txt
+   .venv/bin/python play.py
+   ```
+   Grant your terminal app the Accessibility permission when asked (System Settings > Privacy & Security > Accessibility).
+2. In Clone Hero open the controller settings (Settings > Controls), choose the keyboard as the device and bind each guitar control by pressing it on the guitar when the game asks for an input.
+3. The default keymap is in [tools/keymaps/default.toml](tools/keymaps/default.toml). Strum maps to the arrow keys so the menus can be navigated with the guitar.
+
+The exact Clone Hero menu names may differ between versions.
+
+### Limitations (v1)
+
+- Keyboard output is digital only: whammy and tilt are on/off, with configurable thresholds.
+- The dongle is held exclusively while `play.py` runs.
+
 ## Roadmap
 
 - [x] **Phase 1: Discovery.** Descriptor dump and macOS IORegistry inspection.
 - [x] **Phase 2: Handshake.** Configure the device, power it on over GIP, dongle LED on, guitar syncs.
 - [ ] **Phase 3: Sniffer.** Raw packet dump to confirm the button mapping on real hardware.
-- [ ] **Phase 4: Parser and keyboard output.** Typed guitar state and configurable key mapping.
+- [x] **Phase 4: Parser and keyboard output.** Typed guitar state and configurable key mapping.
 - [ ] **Phase 5: Polish.** Stable CLI or menu bar app, automatic reconnection, full user guide.
 
 The v1 output is keyboard only, so whammy and tilt can only be digital (on/off). The output layer sits behind an interface so a virtual gamepad (DriverKit) can be added later without touching the USB or protocol code.
@@ -39,7 +58,7 @@ The v1 output is keyboard only, so whammy and tilt can only be digital (on/off).
 ## Repository layout
 
 ```
-tools/   Python prototype used for reverse engineering (phases 1–3)
+tools/   Python prototype: reverse engineering tools and the keyboard player (phases 1–4)
 docs/    Protocol notes and references
 ```
 
