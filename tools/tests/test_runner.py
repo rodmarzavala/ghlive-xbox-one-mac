@@ -3,11 +3,12 @@ import unittest
 
 from ghlproto.gip import GipCommand, GipFlag, GipPacket, decode_packet, encode_packet
 from ghlproto.packet_log import PacketLogger
-from ghlproto.runner import READ_TIMEOUT_MS, run_session
+from ghlproto.runner import READ_TIMEOUT_MS, RUN_FOREVER, run_session
 from ghlproto.session import KEEP_ALIVE_INTERVAL_SECONDS
 
 SECONDS_PER_READ = 1.0
 RUN_SECONDS = 20.0
+READS_BEFORE_INTERRUPT = 50
 
 
 class FakeClock:
@@ -35,6 +36,18 @@ class FakeTransport:
         self.read_count += 1
         self._clock.now += SECONDS_PER_READ
         return next(self._reads, None)
+
+
+class InterruptingTransport(FakeTransport):
+    def __init__(self, clock: FakeClock, reads_before_interrupt: int) -> None:
+        super().__init__(clock, [])
+        self._reads_before_interrupt = reads_before_interrupt
+
+    def read(self, timeout_ms: int) -> bytes | None:
+        result = super().read(timeout_ms)
+        if self.read_count > self._reads_before_interrupt:
+            raise KeyboardInterrupt
+        return result
 
 
 class RunSessionTest(unittest.TestCase):
@@ -88,6 +101,13 @@ class RunSessionTest(unittest.TestCase):
         transport, _ = self.run_with([], seconds=KEEP_ALIVE_INTERVAL_SECONDS + 2 * SECONDS_PER_READ)
         keep_alives = [packet for packet in transport.writes if packet.command == GipCommand.GHL_OUTPUT]
         self.assertEqual(len(keep_alives), 2)
+
+    def test_run_forever_keeps_reading_until_interrupted(self):
+        clock = FakeClock()
+        transport = InterruptingTransport(clock, reads_before_interrupt=READS_BEFORE_INTERRUPT)
+        with self.assertRaises(KeyboardInterrupt):
+            run_session(transport, PacketLogger(False, clock=clock, out=io.StringIO()), RUN_FOREVER, clock=clock)
+        self.assertEqual(transport.read_count, READS_BEFORE_INTERRUPT + 1)
 
     def test_loop_exits_at_the_deadline(self):
         transport, _ = self.run_with([], seconds=3 * SECONDS_PER_READ)

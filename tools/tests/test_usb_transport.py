@@ -19,7 +19,7 @@ INTERFACE_NUMBER = 0
 IN_ADDRESS = 0x81
 OUT_ADDRESS = 0x01
 MAX_PACKET_SIZE = 64
-READ_TIMEOUT_MS = 100
+READ_TIMEOUT_MS = 250
 
 
 class FakeInterface(list):
@@ -102,6 +102,13 @@ class DongleTransportTest(unittest.TestCase):
         transport.configure()
         transport.close()
         self.release_interface.assert_called_once_with(self.device, INTERFACE_NUMBER)
+
+    def test_closing_twice_releases_the_interface_once(self):
+        transport = DongleTransport(self.device)
+        transport.configure()
+        transport.close()
+        transport.close()
+        self.release_interface.assert_called_once()
 
     def test_close_ignores_usb_errors_from_an_unplugged_device(self):
         self.release_interface.side_effect = usb.core.USBError("no such device")

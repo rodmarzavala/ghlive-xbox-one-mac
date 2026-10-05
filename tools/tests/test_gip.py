@@ -22,6 +22,7 @@ from ghlproto.gip import (
 SAMPLE_SEQUENCE = 0x07
 CLIENT_ID = 0x00
 CLIENT_ID_THREE = 0x03
+USB_MAX_PACKET_SIZE = 64
 
 
 class EncodeDecodeTest(unittest.TestCase):
@@ -47,6 +48,10 @@ class EncodeDecodeTest(unittest.TestCase):
         with self.assertRaises(GipDecodeError):
             decode_packet(bytes([0x20, 0x00, 0x01, 0x0E, 0x00]))
 
+    def test_payload_one_byte_short_is_rejected(self):
+        with self.assertRaises(GipDecodeError):
+            decode_packet(bytes([0x03, 0x20, 0x01, 0x02, 0x83]))
+
     def test_trailing_usb_padding_is_ignored(self):
         packet = decode_packet(bytes([0x05, 0x20, 0x01, 0x01, 0x00, 0xAA, 0xAA]))
         self.assertEqual(packet.payload, bytes([0x00]))
@@ -67,6 +72,15 @@ class DecodePacketsTest(unittest.TestCase):
 
     def test_single_message_yields_one_packet(self):
         self.assertEqual(len(decode_packets(bytes([0x05, 0x20, 0x01, 0x01, 0x00]))), 1)
+
+    def test_trailing_zero_padding_is_not_decoded_as_packets(self):
+        status = bytes([0x03, 0x20, 0x01, 0x01, 0x83])
+        self.assertEqual(len(decode_packets(status + bytes(USB_MAX_PACKET_SIZE - len(status)))), 1)
+
+    def test_empty_payload_message_is_followed_by_the_next_one(self):
+        empty = bytes([0x03, 0x20, 0x01, 0x00])
+        status = bytes([0x03, 0x20, 0x02, 0x01, 0x83])
+        self.assertEqual([packet.payload for packet in decode_packets(empty + status)], [b"", b"\x83"])
 
     def test_truncated_second_message_reports_error_with_first_packet(self):
         first = bytes([0x05, 0x20, 0x01, 0x01, 0x00])

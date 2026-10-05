@@ -145,6 +145,9 @@ def decode_packets(data: bytes) -> list[GipPacket]:
     packets: list[GipPacket] = []
     offset = 0
     while offset < len(data):
+        # No GIP command is 0x00, so an all-zero remainder is USB padding, not a message.
+        if not any(data[offset:]):
+            break
         try:
             packet, offset = decode_packet_at(data, offset)
         except GipDecodeError as error:
