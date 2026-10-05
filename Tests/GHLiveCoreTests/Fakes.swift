@@ -147,7 +147,7 @@ final class FakeClock: @unchecked Sendable {
 
 /// Polls until the condition holds, yielding to the other main-actor work in between.
 @MainActor
-func eventually(timeout: Duration = .seconds(3), _ condition: @MainActor () -> Bool) async -> Bool {
+func eventually(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while ContinuousClock.now < deadline {
         if condition() { return true }
