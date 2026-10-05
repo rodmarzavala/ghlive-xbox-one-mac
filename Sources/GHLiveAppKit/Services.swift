@@ -30,18 +30,32 @@ public struct NoAccessibilityNeeded: AccessibilityChecking {
     public func request() {}
 }
 
+public enum LaunchAtLoginState: Equatable, Sendable {
+    case enabled
+    case disabled
+    /// Registered, but the user still has to switch it on in System Settings > Login Items.
+    case requiresApproval
+}
+
 /// Seam over `SMAppService.mainApp`.
 @MainActor
 public protocol LaunchAtLoginControlling {
-    var isEnabled: Bool { get }
+    var state: LaunchAtLoginState { get }
     func setEnabled(_ enabled: Bool) throws
+    func openLoginItemsSettings()
 }
 
 @MainActor
 public struct SystemLaunchAtLogin: LaunchAtLoginControlling {
     public init() {}
 
-    public var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
+    public var state: LaunchAtLoginState {
+        switch SMAppService.mainApp.status {
+        case .enabled: .enabled
+        case .requiresApproval: .requiresApproval
+        default: .disabled
+        }
+    }
 
     public func setEnabled(_ enabled: Bool) throws {
         if enabled {
@@ -49,6 +63,10 @@ public struct SystemLaunchAtLogin: LaunchAtLoginControlling {
         } else {
             try SMAppService.mainApp.unregister()
         }
+    }
+
+    public func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 }
 

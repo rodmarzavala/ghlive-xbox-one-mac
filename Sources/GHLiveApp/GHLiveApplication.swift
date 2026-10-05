@@ -8,20 +8,20 @@ private enum WindowID {
     static let monitor = "monitor"
 }
 
-/// Quitting by any route (menu, Cmd-Q, logout) waits until every key is released and the dongle is closed.
+/// Quitting by any route (menu, Cmd-Q, logout, SIGTERM) waits until every key is released and the dongle is
+/// closed, within the model's timeout.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel.live()
+    private var signalObserver: TerminationSignalObserver?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
+        signalObserver = TerminationSignalObserver { NSApp.terminate(nil) }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        Task {
-            await model.shutdown()
-            sender.reply(toApplicationShouldTerminate: true)
-        }
+        model.terminate { sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
 }
@@ -43,7 +43,7 @@ struct GHLiveApplication: App {
         .windowResizability(.contentSize)
 
         Window("GHLive Input Monitor", id: WindowID.monitor) {
-            LiveMonitor(model: delegate.model)
+            LiveMonitor(model: delegate.model, driver: delegate.model.driver)
         }
         .windowResizability(.contentSize)
     }
@@ -59,8 +59,10 @@ private struct LiveMenuIcon: View {
     }
 }
 
+/// Observes the driver as well as the model: guitar reports redraw the monitor but never the menu.
 private struct LiveMonitor: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var driver: GuitarDriver
 
     var body: some View {
         MonitorView(monitor: model.monitor)
@@ -82,6 +84,7 @@ private struct LiveMenu: View {
             openSettings: { show(WindowID.settings) },
             openMonitor: { show(WindowID.monitor) },
             setLaunchAtLogin: model.setLaunchAtLogin,
+            openLoginItems: model.openLoginItemsSettings,
             openKeymapFolder: model.openKeymapFolder,
             showAbout: showAbout,
             quit: { NSApp.terminate(nil) }

@@ -58,6 +58,18 @@ struct ValueSlider: View {
     private var fraction: Double { min(max((value - range.lowerBound) / span, 0), 1) }
 
     private func snapped(_ raw: Double) -> Double {
-        min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+        SliderSnapping.snapped(raw, in: range, step: step)
+    }
+}
+
+enum SliderSnapping {
+    private static let decimalNoise = 1e9
+
+    /// Steps count from the lower bound (0.05 steps from 0.05 land on 0.35, not on multiples of 0.05 off by
+    /// a binary fraction), and float noise such as 0.35000000000000003 is rounded away.
+    static func snapped(_ raw: Double, in range: ClosedRange<Double>, step: Double) -> Double {
+        let steps = ((raw - range.lowerBound) / step).rounded()
+        let value = ((range.lowerBound + steps * step) * decimalNoise).rounded() / decimalNoise
+        return min(max(value, range.lowerBound), range.upperBound)
     }
 }

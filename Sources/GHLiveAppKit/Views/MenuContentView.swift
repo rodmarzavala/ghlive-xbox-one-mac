@@ -7,6 +7,7 @@ public struct MenuActions {
     public var openSettings: () -> Void
     public var openMonitor: () -> Void
     public var setLaunchAtLogin: (Bool) -> Void
+    public var openLoginItems: () -> Void
     public var openKeymapFolder: () -> Void
     public var showAbout: () -> Void
     public var quit: () -> Void
@@ -17,6 +18,7 @@ public struct MenuActions {
         openSettings: @escaping () -> Void = {},
         openMonitor: @escaping () -> Void = {},
         setLaunchAtLogin: @escaping (Bool) -> Void = { _ in },
+        openLoginItems: @escaping () -> Void = {},
         openKeymapFolder: @escaping () -> Void = {},
         showAbout: @escaping () -> Void = {},
         quit: @escaping () -> Void = {}
@@ -26,6 +28,7 @@ public struct MenuActions {
         self.openSettings = openSettings
         self.openMonitor = openMonitor
         self.setLaunchAtLogin = setLaunchAtLogin
+        self.openLoginItems = openLoginItems
         self.openKeymapFolder = openKeymapFolder
         self.showAbout = showAbout
         self.quit = quit
@@ -60,6 +63,7 @@ public struct MenuContentView: View {
                     symbol: menu.launchesAtLogin ? "checkmark.square.fill" : "square",
                     isSelected: menu.launchesAtLogin
                 ) { actions.setLaunchAtLogin(!menu.launchesAtLogin) }
+                if menu.launchAtLoginNeedsApproval { loginItemApproval }
                 if let problem = menu.launchAtLoginProblem { warning(problem) }
                 MenuRow(title: "Open keymap folder", symbol: "folder", action: actions.openKeymapFolder)
                 Divider().padding(.vertical, 4)
@@ -91,14 +95,17 @@ public struct MenuContentView: View {
     }
 
     private var accessibilityCard: some View {
-        Card {
+        Card(border: .orange) {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Allow GHLive to press keys", systemImage: "hand.raised.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.orange)
+                Label {
+                    Text("Allow GHLive to press keys").font(.subheadline.weight(.semibold))
+                } icon: {
+                    Image(systemName: "hand.raised.fill").foregroundColor(.orange)
+                }
                 Text(
-                    "GHLive sends key presses to Clone Hero, and macOS only allows that after you grant "
-                        + "Accessibility access."
+                    "GHLive turns your guitar into key presses for Clone Hero. macOS needs your permission for "
+                        + "that: System Settings opens, switch on GHLive, then come back here. GHLive only sends "
+                        + "key presses; it has no network access and collects no data."
                 )
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -110,11 +117,23 @@ public struct MenuContentView: View {
         }
     }
 
-    private func warning(_ text: String) -> some View {
-        Label(text, systemImage: "exclamationmark.triangle.fill")
+    private var loginItemApproval: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            NoticeLabel(
+                text: "Approve GHLive in System Settings \u{203A} Login Items", symbol: "exclamationmark.circle.fill",
+                color: .orange
+            )
             .font(.caption)
-            .foregroundColor(.red)
-            .fixedSize(horizontal: false, vertical: true)
+            Button("Open Login Items\u{2026}", action: actions.openLoginItems)
+                .buttonStyle(SecondaryButtonStyle())
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    private func warning(_ text: String) -> some View {
+        NoticeLabel(text: text, symbol: "exclamationmark.triangle.fill", color: .red)
+            .font(.caption)
             .padding(.horizontal, 8)
     }
 }

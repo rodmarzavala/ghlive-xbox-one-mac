@@ -9,6 +9,10 @@ public struct SettingsView: View {
     @ObservedObject private var model: SettingsModel
     private let capturesKeys: Bool
 
+    private static let leftColumnGroupCount = 3
+    private static let sliderStep = 1.0
+    private static let whammyStep = 0.05
+
     /// `capturesKeys` is off for screenshots: the AppKit key monitor cannot be rendered.
     public init(model: SettingsModel, capturesKeys: Bool = true) {
         self.model = model
@@ -18,6 +22,7 @@ public struct SettingsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
             HStack(alignment: .top, spacing: 20) {
                 column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
                 VStack(alignment: .leading, spacing: 14) {
@@ -34,9 +39,19 @@ public struct SettingsView: View {
                 KeyCapture(isActive: model.recordingControl != nil, onKeyDown: model.handleKeyDown)
             }
         }
+        .onDisappear { model.cancelRecording() }
+        .alert(
+            "Restore default keys and sensitivity?",
+            isPresented: Binding(
+                get: { model.isConfirmingRestore },
+                set: { if !$0 { model.cancelRestoreDefaults() } })
+        ) {
+            Button("Restore", role: .destructive, action: model.confirmRestoreDefaults)
+            Button("Cancel", role: .cancel, action: model.cancelRestoreDefaults)
+        } message: {
+            Text("Your current setup will be replaced.")
+        }
     }
-
-    private static let leftColumnGroupCount = 3
 
     private func column(_ groups: [ControlGroup]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -51,6 +66,24 @@ public struct SettingsView: View {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func unreadableKeymapCard(_ detail: String) -> some View {
+        Card(border: .red) {
+            VStack(alignment: .leading, spacing: 6) {
+                NoticeLabel(
+                    text: SettingsCopy.unreadableKeymapHeadline, symbol: "xmark.octagon.fill", color: .red
+                )
+                .font(.callout.weight(.semibold))
+                Text(detail).font(.caption).foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Fix the file, or choose Restore defaults to replace it with a working setup.")
+                    .font(.caption).foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open keymap folder", action: model.onOpenKeymapFolder)
+                    .buttonStyle(SecondaryButtonStyle())
+            }
         }
     }
 
@@ -85,15 +118,16 @@ public struct SettingsView: View {
                         explanation: "Raise the guitar past this value to trigger Tilt. It rests around 100.",
                         value: $model.tilt,
                         range: Double(SettingsModel.tiltRange.lowerBound)...Double(SettingsModel.tiltRange.upperBound),
-                        step: 1,
+                        step: Self.sliderStep,
                         formatted: { String(Int($0)) }
                     )
                     thresholdRow(
                         title: "Whammy threshold",
-                        explanation: "How far to push the whammy bar before it counts as pressed.",
+                        explanation:
+                            "How far to push the whammy bar before it counts as pressed. 0 = released, 1 = fully pushed.",
                         value: $model.whammy,
                         range: SettingsModel.whammyRange,
-                        step: 0.05,
+                        step: Self.whammyStep,
                         formatted: { String(format: "%.2f", $0) }
                     )
                 }
@@ -125,30 +159,32 @@ public struct SettingsView: View {
     }
 
     private var footer: some View {
-        HStack(alignment: .top) {
-            messageView
-            Spacer()
-            Button("Restore defaults", action: model.restoreDefaults)
-                .buttonStyle(PillButtonStyle())
+        HStack(alignment: .top, spacing: 16) {
+            messageView.frame(maxWidth: .infinity, alignment: .leading)
+            Button("Restore defaults", action: model.requestRestoreDefaults)
+                .buttonStyle(SecondaryButtonStyle())
         }
     }
 
     @ViewBuilder
     private var messageView: some View {
         if let warning = model.recorderWarning {
-            Label(warning, systemImage: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
+            NoticeLabel(text: warning, symbol: "exclamationmark.triangle.fill", color: .orange)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+        } else if model.recordingControl != nil {
+            Text("Press a key, or click the control again to cancel").font(.callout).foregroundColor(.secondary)
         } else if case .problem(let text) = model.message {
-            Label(text, systemImage: "xmark.octagon.fill")
-                .foregroundColor(.red)
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
+            NoticeLabel(text: text, symbol: "xmark.octagon.fill", color: .red).font(.callout)
         } else if model.message == .saved {
-            Label("Saved", systemImage: "checkmark.circle.fill")
-                .foregroundColor(.green)
-                .font(.callout)
+            VStack(alignment: .leading, spacing: 2) {
+                NoticeLabel(text: "Saved", symbol: "checkmark.circle.fill", color: .green)
+                    .font(.callout).foregroundColor(.secondary)
+                if let note = model.hysteresisNote {
+                    Text(note).font(.caption).foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 }
@@ -160,6 +196,7 @@ private struct ControlRow: View {
     let action: () -> Void
 
     private static let chipWidth: CGFloat = 120
+    private static let chipHeight: CGFloat = 26
 
     var body: some View {
         Button(action: action) {
@@ -169,10 +206,14 @@ private struct ControlRow: View {
                 Text(chipText)
                     .font(.system(.callout, design: .rounded).weight(.semibold))
                     .foregroundColor(isRecording ? .white : .primary)
-                    .frame(width: Self.chipWidth, height: 26)
+                    .frame(width: Self.chipWidth, height: Self.chipHeight)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(isRecording ? Color.accentColor : Color.primary.opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(isRecording ? Color.accentColor : Color.primary.opacity(0.3), lineWidth: 1)
                     )
             }
             .padding(.vertical, 4)
@@ -193,7 +234,7 @@ private struct ControlRow: View {
 /// Feeds key presses to the model while a row is recording, and swallows them so they do not beep.
 private struct KeyCapture: NSViewRepresentable {
     let isActive: Bool
-    let onKeyDown: (UInt16) -> Bool
+    let onKeyDown: (UInt16, NSEvent.ModifierFlags) -> Bool
 
     func makeNSView(context: Context) -> NSView { NSView() }
 
@@ -210,13 +251,18 @@ private struct KeyCapture: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private var monitor: Any?
-        private var onKeyDown: (UInt16) -> Bool = { _ in false }
+        private var onKeyDown: (UInt16, NSEvent.ModifierFlags) -> Bool = { _, _ in false }
 
-        func update(isActive: Bool, onKeyDown: @escaping (UInt16) -> Bool) {
+        func update(isActive: Bool, onKeyDown: @escaping (UInt16, NSEvent.ModifierFlags) -> Bool) {
             self.onKeyDown = onKeyDown
             if isActive, monitor == nil {
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                    guard let self, MainActor.assumeIsolated({ self.onKeyDown(event.keyCode) }) else { return event }
+                    // NSEvent is not Sendable and Swift 6.0 rejects capturing it in `assumeIsolated`, so read it first.
+                    let keyCode = event.keyCode
+                    let modifiers = event.modifierFlags
+                    guard let self, MainActor.assumeIsolated({ self.onKeyDown(keyCode, modifiers) }) else {
+                        return event
+                    }
                     return nil
                 }
             } else if !isActive {

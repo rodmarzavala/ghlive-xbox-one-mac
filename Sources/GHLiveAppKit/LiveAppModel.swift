@@ -8,8 +8,14 @@ extension AppModel {
     /// Set to `1` to log key events to stderr instead of posting them (development only).
     public static let dryRunVariable = "GHLIVE_DRY_RUN"
 
+    /// Only the exact value `1` enables it, so a stray `0` or empty value can never silence the keyboard
+    /// by accident, and nothing else turns real key events off.
+    public static func isDryRun(environment: [String: String]) -> Bool {
+        environment[dryRunVariable] == "1"
+    }
+
     public static func live(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppModel {
-        let isDryRun = environment[dryRunVariable] == "1"
+        let isDryRun = isDryRun(environment: environment)
         let store = KeymapStore.standard
         let loaded = loadKeymap(from: store)
         let emitter: any KeyEmitter = isDryRun ? DryRunKeyEmitter(write: writeToStandardError) : CGEventKeyEmitter()
@@ -19,6 +25,7 @@ extension AppModel {
             emitter: emitter,
             keymap: loaded.keymap,
             store: store,
+            keymapFolder: store.fileURL.deletingLastPathComponent(),
             keymapProblem: loaded.problem,
             accessibility: accessibility,
             launchAtLogin: SystemLaunchAtLogin(),
@@ -31,15 +38,8 @@ extension AppModel {
         do {
             return (try store.load(), nil)
         } catch {
-            return (.default, "\(error.localizedDescription) Using the default keys until you change a setting.")
+            return (.default, error.localizedDescription)
         }
-    }
-
-    /// Opens the folder that holds `keymap.json`, creating it first so the Finder window is never empty-handed.
-    public func openKeymapFolder() {
-        let folder = KeymapStore.standard.fileURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(folder)
     }
 }
 

@@ -18,12 +18,18 @@ enum Metrics {
     static let cardFillOpacity = 0.06
     static let strokeOpacity = 0.15
     static let hairline: CGFloat = 1
+    static let emphasisBorder: CGFloat = 1.5
 }
 
 struct Card<Content: View>: View {
+    private let border: Color
+    private let borderWidth: CGFloat
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    /// `border` replaces the neutral outline, for cards that must stand out.
+    init(border: Color? = nil, @ViewBuilder content: () -> Content) {
+        self.border = border ?? Color.primary.opacity(Metrics.strokeOpacity)
+        borderWidth = border == nil ? Metrics.hairline : Metrics.emphasisBorder
         self.content = content()
     }
 
@@ -37,7 +43,7 @@ struct Card<Content: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                    .stroke(Color.primary.opacity(Metrics.strokeOpacity), lineWidth: Metrics.hairline)
+                    .stroke(border, lineWidth: borderWidth)
             )
     }
 }
@@ -73,5 +79,35 @@ struct PillButtonStyle: ButtonStyle {
             .padding(.vertical, 6)
             .background(Capsule().fill(Color.accentColor))
             .opacity(configuration.isPressed ? Self.pressedOpacity : 1)
+    }
+}
+
+/// A quieter button next to a primary one.
+struct SecondaryButtonStyle: ButtonStyle {
+    private static let pressedOpacity = 0.6
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout.weight(.medium))
+            .foregroundColor(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.primary.opacity(Metrics.cardFillOpacity)))
+            .overlay(Capsule().stroke(Color.primary.opacity(Metrics.strokeOpacity * 2), lineWidth: Metrics.hairline))
+            .opacity(configuration.isPressed ? Self.pressedOpacity : 1)
+    }
+}
+
+/// Coloured icon, primary text: coloured text does not reach AA contrast in light mode.
+struct NoticeLabel: View {
+    let text: String
+    let symbol: String
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: symbol).foregroundColor(color).accessibilityHidden(true)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

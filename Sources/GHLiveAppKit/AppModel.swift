@@ -10,7 +10,7 @@ public struct MenuPresentation: Equatable, Sendable {
     public let status: StatusPresentation
     public let isPaused: Bool
     public let needsAccessibility: Bool
-    public let launchesAtLogin: Bool
+    public let launchAtLogin: LaunchAtLoginState
     public let launchAtLoginProblem: String?
     public let keymapProblem: String?
 
@@ -18,49 +18,60 @@ public struct MenuPresentation: Equatable, Sendable {
         status: StatusPresentation,
         isPaused: Bool,
         needsAccessibility: Bool,
-        launchesAtLogin: Bool,
+        launchAtLogin: LaunchAtLoginState,
         launchAtLoginProblem: String? = nil,
         keymapProblem: String? = nil
     ) {
         self.status = status
         self.isPaused = isPaused
         self.needsAccessibility = needsAccessibility
-        self.launchesAtLogin = launchesAtLogin
+        self.launchAtLogin = launchAtLogin
         self.launchAtLoginProblem = launchAtLoginProblem
         self.keymapProblem = keymapProblem
     }
 
     public var pauseTitle: String { isPaused ? "Resume" : "Pause" }
+    public var launchesAtLogin: Bool { launchAtLogin == .enabled }
+    public var launchAtLoginNeedsApproval: Bool { launchAtLogin == .requiresApproval }
 }
 
 /// Owns the driver and everything the windows share: the keymap, the Accessibility permission and the
 /// launch-at-login switch.
+///
+/// Only `menu` and `keymap` publish. Guitar reports arrive many times a second and must not redraw the
+/// menu, so the Input Monitor observes the driver itself.
 @MainActor
 public final class AppModel: ObservableObject {
     public static let defaultPollInterval: Duration = .seconds(1)
+    public static let terminationTimeout: Duration = .seconds(3)
 
     public let driver: GuitarDriver
     public let settings: SettingsModel
 
     @Published public private(set) var keymap: Keymap
-    @Published public private(set) var isAccessibilityTrusted: Bool
-    @Published public private(set) var launchesAtLogin: Bool
-    @Published public private(set) var launchAtLoginProblem: String?
+    @Published public private(set) var menu: MenuPresentation
 
     private let emitter: any KeyEmitter
+    private let keymapFolder: URL
     private let accessibility: any AccessibilityChecking
     private let launchAtLogin: any LaunchAtLoginControlling
     private let openURL: (URL) -> Void
     private let pollInterval: Duration
     private var pollTask: Task<Void, Never>?
-    private var driverChanges: AnyCancellable?
-    private var settingsChanges: AnyCancellable?
+    private var subscriptions: Set<AnyCancellable> = []
+
+    private var statusPresentation: StatusPresentation
+    private var isTrusted: Bool
+    private var launchState: LaunchAtLoginState
+    private var launchProblem: String?
+    private var keymapProblem: String?
 
     public init(
         driver: GuitarDriver,
         emitter: any KeyEmitter,
         keymap: Keymap,
         store: any KeymapPersisting,
+        keymapFolder: URL,
         keymapProblem: String? = nil,
         accessibility: any AccessibilityChecking,
         launchAtLogin: any LaunchAtLoginControlling,
@@ -70,34 +81,34 @@ public final class AppModel: ObservableObject {
         self.driver = driver
         self.emitter = emitter
         self.keymap = keymap
+        self.keymapFolder = keymapFolder
         self.accessibility = accessibility
         self.launchAtLogin = launchAtLogin
         self.openURL = openURL
         self.pollInterval = pollInterval
-        isAccessibilityTrusted = accessibility.isTrusted
-        launchesAtLogin = launchAtLogin.isEnabled
-        settings = SettingsModel(keymap: keymap, store: store, loadProblem: keymapProblem)
+        let settings = SettingsModel(keymap: keymap, store: store, loadProblem: keymapProblem)
+        let status = StatusPresentation(status: driver.status, isPaused: driver.isPaused)
+        let problem = Self.problemText(settings.message)
+        let launchState = launchAtLogin.state
+        self.settings = settings
+        statusPresentation = status
+        isTrusted = accessibility.isTrusted
+        self.launchState = launchState
+        self.keymapProblem = problem
+        menu = Self.menu(
+            status: status, isPaused: driver.isPaused, isTrusted: accessibility.isTrusted, launch: launchState,
+            launchProblem: nil, keymapProblem: problem)
         settings.onSaved = { [weak self] saved in self?.apply(saved) }
-        driverChanges = driver.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
-        settingsChanges = settings.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        settings.onOpenKeymapFolder = { [weak self] in self?.openKeymapFolder() }
+        observeDriverAndSettings()
     }
 
     // MARK: Presentation
 
-    public var menu: MenuPresentation {
-        MenuPresentation(
-            status: StatusPresentation(status: driver.status, isPaused: driver.isPaused),
-            isPaused: driver.isPaused,
-            needsAccessibility: !isAccessibilityTrusted,
-            launchesAtLogin: launchesAtLogin,
-            launchAtLoginProblem: launchAtLoginProblem,
-            keymapProblem: settings.message.flatMap(Self.problemText)
-        )
-    }
-
+    /// Not published: it changes with every guitar report. Views that show it observe `driver`.
     public var monitor: MonitorPresentation {
         MonitorPresentation(
-            status: StatusPresentation(status: driver.status, isPaused: driver.isPaused),
+            status: statusPresentation,
             snapshot: driver.snapshot,
             thresholds: keymap.thresholds,
             bindings: keymap.bindings,
@@ -105,16 +116,53 @@ public final class AppModel: ObservableObject {
         )
     }
 
-    private static func problemText(_ message: SettingsMessage) -> String? {
-        guard case .problem(let text) = message else { return nil }
-        return text
+    private func observeDriverAndSettings() {
+        driver.$status.combineLatest(driver.$isPaused)
+            .sink { [weak self] status, isPaused in
+                guard let self else { return }
+                statusPresentation = StatusPresentation(status: status, isPaused: isPaused)
+                publishMenu(isPaused: isPaused)
+            }
+            .store(in: &subscriptions)
+        settings.$message
+            .sink { [weak self] message in
+                guard let self else { return }
+                keymapProblem = Self.problemText(message)
+                publishMenu()
+            }
+            .store(in: &subscriptions)
+    }
+
+    /// `isPaused` is passed in by the Combine sink, which runs before the driver's property has changed.
+    private func publishMenu(isPaused: Bool? = nil) {
+        let updated = Self.menu(
+            status: statusPresentation, isPaused: isPaused ?? driver.isPaused, isTrusted: isTrusted,
+            launch: launchState, launchProblem: launchProblem, keymapProblem: keymapProblem)
+        if updated != menu { menu = updated }
+    }
+
+    private static func menu(
+        status: StatusPresentation, isPaused: Bool, isTrusted: Bool, launch: LaunchAtLoginState,
+        launchProblem: String?, keymapProblem: String?
+    ) -> MenuPresentation {
+        MenuPresentation(
+            status: status, isPaused: isPaused, needsAccessibility: !isTrusted, launchAtLogin: launch,
+            launchAtLoginProblem: launchProblem, keymapProblem: keymapProblem)
+    }
+
+    private static func problemText(_ message: SettingsMessage?) -> String? {
+        switch message {
+        case .problem(let text): text
+        case .unreadableKeymap: SettingsCopy.unreadableKeymapHeadline
+        case .saved, nil: nil
+        }
     }
 
     // MARK: Lifecycle
 
     public func start() {
         driver.start()
-        startPollingAccessibility()
+        startPollingSystemState()
     }
 
     /// Releases every key and closes the dongle. Quitting waits for this.
@@ -122,6 +170,26 @@ public final class AppModel: ObservableObject {
         pollTask?.cancel()
         pollTask = nil
         await driver.stop()
+    }
+
+    /// Answers the system's "may I quit?" question: `reply` runs once the keys are released, or after
+    /// `timeout` if stopping hangs, so a stuck dongle can never keep the app from quitting.
+    public func terminate(timeout: Duration = AppModel.terminationTimeout, reply: @escaping @MainActor () -> Void) {
+        terminate(shutdown: { await self.shutdown() }, timeout: timeout, reply: reply)
+    }
+
+    func terminate(
+        shutdown: @escaping @MainActor () async -> Void, timeout: Duration, reply: @escaping @MainActor () -> Void
+    ) {
+        let once = ReplyOnce(reply)
+        Task {
+            await shutdown()
+            once.send()
+        }
+        Task {
+            try? await Task.sleep(for: timeout)
+            once.send()
+        }
     }
 
     public func togglePause() {
@@ -142,17 +210,20 @@ public final class AppModel: ObservableObject {
     /// Once the permission arrives, the output is rebuilt so it starts from a clean slate.
     public func refreshAccessibility() {
         let trusted = accessibility.isTrusted
-        guard trusted != isAccessibilityTrusted else { return }
-        isAccessibilityTrusted = trusted
+        guard trusted != isTrusted else { return }
+        isTrusted = trusted
+        publishMenu()
         if trusted { apply(keymap) }
     }
 
-    private func startPollingAccessibility() {
+    private func startPollingSystemState() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self, pollInterval] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: pollInterval)
-                self?.refreshAccessibility()
+                do { try await Task.sleep(for: pollInterval) } catch { return }
+                guard let self else { return }
+                refreshAccessibility()
+                refreshLaunchAtLogin()
             }
         }
     }
@@ -162,17 +233,54 @@ public final class AppModel: ObservableObject {
     public func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try launchAtLogin.setEnabled(enabled)
-            launchAtLoginProblem = nil
+            launchProblem = nil
         } catch {
-            launchAtLoginProblem = "Could not change Launch at Login: \(error.localizedDescription)"
+            launchProblem = "Could not change Launch at Login: \(error.localizedDescription)"
         }
-        launchesAtLogin = launchAtLogin.isEnabled
+        launchState = launchAtLogin.state
+        publishMenu()
+    }
+
+    /// The user can approve or remove the login item in System Settings at any time.
+    public func refreshLaunchAtLogin() {
+        let state = launchAtLogin.state
+        guard state != launchState else { return }
+        launchState = state
+        publishMenu()
+    }
+
+    public func openLoginItemsSettings() {
+        launchAtLogin.openLoginItemsSettings()
     }
 
     // MARK: Keymap
+
+    /// Opens the folder that holds `keymap.json`, creating it first so Finder never lands on a missing path.
+    public func openKeymapFolder() {
+        try? FileManager.default.createDirectory(at: keymapFolder, withIntermediateDirectories: true)
+        openURL(keymapFolder)
+    }
 
     private func apply(_ newKeymap: Keymap) {
         keymap = newKeymap
         driver.reconfigure(sink: KeyboardSink(keymap: newKeymap, emitter: emitter), thresholds: newKeymap.thresholds)
     }
+}
+
+@MainActor
+private final class ReplyOnce {
+    private var reply: (@MainActor () -> Void)?
+
+    init(_ reply: @escaping @MainActor () -> Void) {
+        self.reply = reply
+    }
+
+    func send() {
+        reply?()
+        reply = nil
+    }
+}
+
+enum SettingsCopy {
+    static let unreadableKeymapHeadline = "Your saved keys couldn't be read, so GHLive is using the defaults."
 }

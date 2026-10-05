@@ -4,7 +4,7 @@ import KeyMapping
 
 /// Everything the Input Monitor draws, as plain values so it can be rendered for any sample state.
 public struct MonitorPresentation: Equatable, Sendable {
-    public static let tiltMaximum: Double = 255
+    private static let tiltMaximum = Double(Thresholds.tiltMaximum)
 
     public let status: StatusPresentation
     public let state: GuitarState?

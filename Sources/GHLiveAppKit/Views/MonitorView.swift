@@ -28,6 +28,8 @@ public struct MonitorView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     whammyMeter
                     tiltMeter
+                    Text("A key is sent when the bar crosses the line. Adjust in Settings.")
+                        .font(.caption).foregroundColor(.secondary)
                 }
             }
             keysBeingSent
@@ -184,11 +186,20 @@ private struct FretView: View {
     let isBlack: Bool
     let isPressed: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private static let size: CGFloat = 54
+    private static let pressedRingWidth: CGFloat = 5
+    private static let whiteInDarkMode = 0.9
+    private static let whiteInLightMode = 0.96
 
     var body: some View {
         ZStack {
             Circle().fill(fill)
+            if isPressed {
+                // The ring keeps the row identifiable: a pressed black fret stays dark-ringed, a white one light.
+                Circle().strokeBorder(ringColor, lineWidth: Self.pressedRingWidth)
+            }
             Circle().stroke(isPressed ? Color.accentColor : Color.primary.opacity(0.4), lineWidth: 2)
             if let keyLabel {
                 Text(keyLabel)
@@ -205,7 +216,15 @@ private struct FretView: View {
 
     private var fill: Color {
         if isPressed { return .accentColor }
-        return isBlack ? Color(white: 0.12) : Color(white: 0.96)
+        return isBlack ? Color(white: 0.12) : Color(white: whiteLevel)
+    }
+
+    private var ringColor: Color {
+        isBlack ? Color(white: 0.1) : Color(white: whiteLevel)
+    }
+
+    private var whiteLevel: Double {
+        colorScheme == .dark ? Self.whiteInDarkMode : Self.whiteInLightMode
     }
 
     private var labelColor: Color {
@@ -271,6 +290,14 @@ private struct MeterView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title).fontWeight(.medium)
+                // Always laid out, so the row does not shift when the control engages.
+                Text("ON")
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.green.opacity(0.3)))
+                    .opacity(isEngaged ? 1 : 0)
+                    .accessibilityHidden(true)
                 Spacer()
                 Text(valueText).monospacedDigit().fontWeight(.semibold)
                 Text("/ trigger at \(thresholdText)").font(.caption).foregroundColor(.secondary)
@@ -292,11 +319,6 @@ private struct MeterView: View {
                 .frame(maxHeight: .infinity)
             }
             .frame(height: Self.barHeight + 8)
-            .overlay(alignment: .trailing) {
-                if isEngaged {
-                    Text("ON").font(.caption2.weight(.bold)).foregroundColor(.green).offset(y: -14)
-                }
-            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)

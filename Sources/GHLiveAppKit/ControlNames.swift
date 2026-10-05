@@ -5,12 +5,12 @@ extension Control {
     /// The name shown in Settings and read out by VoiceOver.
     public var friendlyName: String {
         switch self {
-        case .black1: "Top fret 1 (black)"
-        case .black2: "Top fret 2 (black)"
-        case .black3: "Top fret 3 (black)"
-        case .white1: "Bottom fret 1 (white)"
-        case .white2: "Bottom fret 2 (white)"
-        case .white3: "Bottom fret 3 (white)"
+        case .black1: "Black 1"
+        case .black2: "Black 2"
+        case .black3: "Black 3"
+        case .white1: "White 1"
+        case .white2: "White 2"
+        case .white3: "White 3"
         case .strumUp: "Strum up"
         case .strumDown: "Strum down"
         case .heroPower: "Hero Power"

@@ -77,24 +77,31 @@ enum SampleStates {
         let ready = StatusPresentation(status: .dongleReady, isPaused: false)
         let active = StatusPresentation(status: .guitarActive, isPaused: false)
         let paused = StatusPresentation(status: .guitarActive, isPaused: true)
-        let failure = StatusPresentation(
+        let connecting = StatusPresentation(status: .connecting, isPaused: false)
+        let busy = StatusPresentation(
             status: .error(DongleError.exclusiveAccess.localizedDescription), isPaused: false)
+        let failure = StatusPresentation(
+            status: .error(DongleError.ioFailure(operation: "read", code: -1).localizedDescription), isPaused: false)
         return [
             menu("menu-waiting", waiting),
             menu("menu-needs-accessibility", waiting, needsAccessibility: true),
+            menu("menu-connecting", connecting),
             menu("menu-ready", ready),
-            menu("menu-active", active, launchesAtLogin: true),
+            menu("menu-active", active, launchAtLogin: .enabled),
+            menu("menu-login-needs-approval", active, launchAtLogin: .requiresApproval),
             menu("menu-paused", paused),
+            menu("menu-dongle-busy", busy),
             menu("menu-error", failure),
         ]
     }
 
     private static func menu(
-        _ name: String, _ status: StatusPresentation, needsAccessibility: Bool = false, launchesAtLogin: Bool = false
+        _ name: String, _ status: StatusPresentation, needsAccessibility: Bool = false,
+        launchAtLogin: LaunchAtLoginState = .disabled
     ) -> SampleScreen {
         let presentation = MenuPresentation(
             status: status, isPaused: status.tone == .paused, needsAccessibility: needsAccessibility,
-            launchesAtLogin: launchesAtLogin)
+            launchAtLogin: launchAtLogin)
         return SampleScreen(name: name, view: AnyView(MenuContentView(menu: presentation, actions: MenuActions())))
     }
 
@@ -115,7 +122,7 @@ enum SampleStates {
                 snapshot: snapshot(
                     buttons: [.black2, .black3, .white1, .strumUp, .heroPower], dpad: [.left], whammy: 0.9,
                     tilt: 171, thresholds: thresholds)),
-            monitor("monitor-error", status: .error(DongleError.notFound.localizedDescription), snapshot: nil),
+            monitor("monitor-error", status: .error(DongleError.exclusiveAccess.localizedDescription), snapshot: nil),
         ]
     }
 
@@ -149,14 +156,17 @@ enum SampleStates {
         recording.handleKeyDown(keyCode: unsupportedKeyCode)
         let broken = SettingsModel(
             keymap: .default, store: DiscardingStore(),
-            loadProblem:
-                "keymap.json: unknown key 'ctrl' for control 'tilt'. Using the default keys until you change a setting."
+            loadProblem: "keymap.json: unknown key 'ctrl' for control 'tilt'"
         )
+        let waiting = SettingsModel(keymap: .default, store: DiscardingStore())
+        waiting.toggleRecording(.black1)
         return [
             SampleScreen(name: "settings", view: AnyView(SettingsView(model: saved, capturesKeys: false))),
             SampleScreen(
                 name: "settings-recording-rejected-key",
                 view: AnyView(SettingsView(model: recording, capturesKeys: false))),
+            SampleScreen(
+                name: "settings-recording", view: AnyView(SettingsView(model: waiting, capturesKeys: false))),
             SampleScreen(name: "settings-error", view: AnyView(SettingsView(model: broken, capturesKeys: false))),
         ]
     }

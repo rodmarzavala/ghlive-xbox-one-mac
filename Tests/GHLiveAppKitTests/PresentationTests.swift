@@ -1,8 +1,10 @@
 import AppKit
+import Foundation
 import GHLiveCore
 import GuitarInput
 import KeyMapping
 import Testing
+import USBTransport
 
 @testable import GHLiveAppKit
 
@@ -27,9 +29,32 @@ struct StatusPresentationTests {
         }
     }
 
-    @Test func errorsComeWithARetryHint() {
+    @Test func unknownErrorsComeWithARetryHint() {
         let presentation = StatusPresentation(status: .error("boom"), isPaused: false)
-        #expect(presentation.detail?.contains("tries again") == true)
+        #expect(presentation.headline == "boom")
+        #expect(presentation.detail == "GHLive retries every few seconds.")
+    }
+
+    @Test func aMissingDongleReadsTheSameWhetherWaitingOrFailed() {
+        let waiting = StatusPresentation(status: .waitingForDongle, isPaused: false)
+        let failed = StatusPresentation(status: .error(DongleError.notFound.localizedDescription), isPaused: false)
+        #expect(failed == waiting)
+        #expect(waiting.detail == "Plug in the Xbox One wireless adapter.")
+    }
+
+    @Test func aBusyDongleSaysWhoToQuit() {
+        let presentation = StatusPresentation(
+            status: .error(DongleError.exclusiveAccess.localizedDescription), isPaused: false)
+        #expect(presentation.tone == .error)
+        #expect(presentation.headline == "The dongle is in use by another app")
+        #expect(presentation.detail?.hasPrefix("Quit Steam or any other app that reads Xbox controllers.") == true)
+    }
+
+    @Test func connectingAndReadyStatesSetExpectations() {
+        #expect(StatusPresentation(status: .connecting, isPaused: false).detail == "This takes a few seconds.")
+        #expect(
+            StatusPresentation(status: .dongleReady, isPaused: false).detail
+                == "If it doesn't connect, turn the guitar off and on again.")
     }
 
     @Test func everyToneHasADistinctSymbolThatExists() {
@@ -46,8 +71,8 @@ struct ControlNamesTests {
     @Test func everyControlHasAUniqueFriendlyName() {
         let names = Control.allCases.map(\.friendlyName)
         #expect(Set(names).count == Control.allCases.count)
-        #expect(Control.black1.friendlyName == "Top fret 1 (black)")
-        #expect(Control.white3.friendlyName == "Bottom fret 3 (white)")
+        #expect(Control.black1.friendlyName == "Black 1")
+        #expect(Control.white3.friendlyName == "White 3")
         #expect(Control.heroPower.friendlyName == "Hero Power")
     }
 
@@ -71,6 +96,15 @@ struct KeyRecorderTests {
             let key = KeyCode.named(name)!
             #expect(KeyRecorder.outcome(forKeyCode: key.rawValue) == .accepted(key))
         }
+    }
+
+    @Test func shortcutsAreNotRecorded() {
+        #expect(KeyRecorder.isShortcut(.command))
+        #expect(KeyRecorder.isShortcut([.control, .shift]))
+        #expect(KeyRecorder.isShortcut(.option))
+        #expect(!KeyRecorder.isShortcut([]))
+        #expect(!KeyRecorder.isShortcut(.shift))
+        #expect(!KeyRecorder.isShortcut(.capsLock))
     }
 
     @Test func unsupportedKeysAreRejectedWithAMessage() {
@@ -114,5 +148,24 @@ struct MonitorPresentationTests {
         #expect(monitor.keysBeingSent.isEmpty)
         #expect(monitor.whammyLevel == 0)
         #expect(monitor.tiltLevel == 0)
+    }
+}
+
+struct SliderSnappingTests {
+    private static let whammy = 0.05...1.0
+
+    @Test func stepsLandOnCleanDecimals() {
+        #expect(SliderSnapping.snapped(0.3512, in: Self.whammy, step: 0.05) == 0.35)
+        #expect(SliderSnapping.snapped(0.5, in: Self.whammy, step: 0.05) == 0.5)
+        #expect(SliderSnapping.snapped(0.15, in: Self.whammy, step: 0.05) == 0.15)
+    }
+
+    @Test func valuesStayInsideTheRange() {
+        #expect(SliderSnapping.snapped(-3, in: Self.whammy, step: 0.05) == 0.05)
+        #expect(SliderSnapping.snapped(9, in: Self.whammy, step: 0.05) == 1.0)
+    }
+
+    @Test func wholeNumberSlidersRoundToIntegers() {
+        #expect(SliderSnapping.snapped(149.6, in: 1...255, step: 1) == 150)
     }
 }

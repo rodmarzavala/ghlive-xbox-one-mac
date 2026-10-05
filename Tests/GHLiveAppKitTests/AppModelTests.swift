@@ -1,8 +1,21 @@
+import Combine
+import Foundation
 import GHLiveCore
 import KeyMapping
 import Testing
 
 @testable import GHLiveAppKit
+
+private let pollInterval: Duration = .milliseconds(10)
+private let patience: Duration = .seconds(3)
+
+@MainActor
+private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
+    let deadline = ContinuousClock.now + patience
+    while !condition(), ContinuousClock.now < deadline {
+        try await Task.sleep(for: pollInterval)
+    }
+}
 
 @MainActor
 struct AppModelTests {
@@ -16,7 +29,28 @@ struct AppModelTests {
         #expect(fixture.model.menu.status.tone == .paused)
         fixture.model.togglePause()
         #expect(!fixture.model.driver.isPaused)
+        #expect(fixture.model.menu.status.tone == .waiting)
     }
+
+    @Test func menuAndMonitorShareOneStatusPresentation() {
+        let fixture = AppFixture()
+        fixture.model.togglePause()
+        #expect(fixture.model.monitor.status == fixture.model.menu.status)
+    }
+
+    @Test func theMenuOnlyPublishesWhenItChanges() {
+        let fixture = AppFixture()
+        var changes = 0
+        let subscription = fixture.model.objectWillChange.sink { changes += 1 }
+        fixture.model.refreshAccessibility()
+        fixture.model.refreshLaunchAtLogin()
+        #expect(changes == 0)
+        fixture.model.togglePause()
+        #expect(changes == 1)
+        subscription.cancel()
+    }
+
+    // MARK: Accessibility
 
     @Test func missingPermissionShowsTheGrantItemAndOpensSystemSettings() {
         let fixture = AppFixture(isTrusted: false)
@@ -40,6 +74,38 @@ struct AppModelTests {
         #expect(fixture.sink.releaseCount == 1)
     }
 
+    @Test func revokingThePermissionDoesNotRebuildTheOutput() {
+        let fixture = AppFixture(isTrusted: true)
+        fixture.accessibility.isTrusted = false
+        fixture.model.refreshAccessibility()
+        #expect(fixture.model.menu.needsAccessibility)
+        #expect(fixture.sink.releaseCount == 0)
+    }
+
+    @Test func thePollNoticesAPermissionGrantByItself() async throws {
+        let fixture = AppFixture(isTrusted: false, pollInterval: pollInterval)
+        fixture.model.start()
+        fixture.accessibility.isTrusted = true
+        try await waitUntil { fixture.sink.releaseCount >= 1 }
+        #expect(fixture.sink.releaseCount == 1)
+        #expect(!fixture.model.menu.needsAccessibility)
+        await fixture.model.shutdown()
+    }
+
+    @Test func thePollNoticesTheLoginItemBeingApproved() async throws {
+        let fixture = AppFixture(pollInterval: pollInterval)
+        fixture.model.start()
+        fixture.launchAtLogin.state = .requiresApproval
+        try await waitUntil { fixture.model.menu.launchAtLoginNeedsApproval }
+        #expect(fixture.model.menu.launchAtLoginNeedsApproval)
+        fixture.launchAtLogin.state = .enabled
+        try await waitUntil { fixture.model.menu.launchesAtLogin }
+        #expect(fixture.model.menu.launchesAtLogin)
+        await fixture.model.shutdown()
+    }
+
+    // MARK: Settings
+
     @Test func savedSettingsReconfigureTheDriver() {
         let fixture = AppFixture()
         fixture.model.settings.toggleRecording(.black1)
@@ -49,15 +115,74 @@ struct AppModelTests {
         #expect(fixture.model.monitor.keyLabel(for: .black1) == "A")
     }
 
-    @Test func launchAtLoginIsToggledAndFailuresAreShown() {
+    @Test func aSaveFailureAppearsInTheMenuAndClearsOnTheNextSave() {
+        let fixture = AppFixture()
+        fixture.store.failure = StoreFailure()
+        fixture.model.settings.commit()
+        #expect(fixture.model.menu.keymapProblem == "disk is full")
+        fixture.store.failure = nil
+        fixture.model.settings.commit()
+        #expect(fixture.model.menu.keymapProblem == nil)
+    }
+
+    @Test func openingTheKeymapFolderCreatesItAndOpensIt() {
+        let fixture = AppFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.keymapFolder) }
+        fixture.model.openKeymapFolder()
+        var isDirectory: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: fixture.keymapFolder.path, isDirectory: &isDirectory))
+        #expect(isDirectory.boolValue)
+        #expect(fixture.opened.urls == [fixture.keymapFolder])
+    }
+
+    @Test func theSettingsButtonOpensTheSameFolder() {
+        let fixture = AppFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.keymapFolder) }
+        fixture.model.settings.onOpenKeymapFolder()
+        #expect(fixture.opened.urls == [fixture.keymapFolder])
+    }
+
+    // MARK: Launch at login
+
+    @Test func launchAtLoginIsToggled() {
         let fixture = AppFixture()
         fixture.model.setLaunchAtLogin(true)
         #expect(fixture.model.menu.launchesAtLogin)
+        fixture.model.setLaunchAtLogin(false)
+        #expect(!fixture.model.menu.launchesAtLogin)
+    }
+
+    @Test func aFailedToggleKeepsTheStateAndShowsTheWarning() {
+        let fixture = AppFixture()
+        fixture.model.setLaunchAtLogin(true)
         fixture.launchAtLogin.failure = StoreFailure()
         fixture.model.setLaunchAtLogin(false)
         #expect(fixture.model.menu.launchesAtLogin)
         #expect(fixture.model.menu.launchAtLoginProblem?.contains("disk is full") == true)
     }
+
+    @Test func theWarningClearsAfterASuccessfulToggle() {
+        let fixture = AppFixture()
+        fixture.launchAtLogin.failure = StoreFailure()
+        fixture.model.setLaunchAtLogin(true)
+        #expect(fixture.model.menu.launchAtLoginProblem != nil)
+        fixture.launchAtLogin.failure = nil
+        fixture.model.setLaunchAtLogin(true)
+        #expect(fixture.model.menu.launchAtLoginProblem == nil)
+        #expect(fixture.model.menu.launchesAtLogin)
+    }
+
+    @Test func aLoginItemThatNeedsApprovalIsReportedAndCanOpenSystemSettings() {
+        let fixture = AppFixture()
+        fixture.launchAtLogin.state = .requiresApproval
+        fixture.model.refreshLaunchAtLogin()
+        #expect(fixture.model.menu.launchAtLoginNeedsApproval)
+        #expect(!fixture.model.menu.launchesAtLogin)
+        fixture.model.openLoginItemsSettings()
+        #expect(fixture.launchAtLogin.openedSettingsCount == 1)
+    }
+
+    // MARK: Quitting
 
     @Test func shutdownReleasesTheKeys() async {
         let fixture = AppFixture()
@@ -66,10 +191,44 @@ struct AppModelTests {
         #expect(fixture.sink.releaseCount >= 1)
     }
 
-    @Test func aKeymapProblemAppearsInTheMenu() {
+    @Test func terminateRepliesOnlyAfterTheKeysAreReleased() async throws {
         let fixture = AppFixture()
-        fixture.store.failure = StoreFailure()
-        fixture.model.settings.commit()
-        #expect(fixture.model.menu.keymapProblem == "disk is full")
+        fixture.model.start()
+        var releasesAtReply: Int?
+        fixture.model.terminate { releasesAtReply = fixture.sink.releaseCount }
+        #expect(releasesAtReply == nil)
+        try await waitUntil { releasesAtReply != nil }
+        #expect((releasesAtReply ?? 0) >= 1)
+    }
+
+    @Test func terminateGivesUpWhenStoppingHangs() async throws {
+        let fixture = AppFixture()
+        var replies = 0
+        let hungForever: @MainActor () async -> Void = { try? await Task.sleep(for: .seconds(30)) }
+        fixture.model.terminate(shutdown: hungForever, timeout: .milliseconds(50)) { replies += 1 }
+        #expect(replies == 0)
+        try await waitUntil { replies > 0 }
+        #expect(replies == 1)
+    }
+
+    @Test func terminateRepliesOnlyOnce() async throws {
+        let fixture = AppFixture()
+        var replies = 0
+        let instant: @MainActor () async -> Void = {}
+        fixture.model.terminate(shutdown: instant, timeout: .milliseconds(50)) { replies += 1 }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(replies == 1)
+    }
+}
+
+@MainActor
+struct DryRunEnvironmentTests {
+    @Test func onlyTheExactValueOneEnablesDryRun() {
+        let variable = AppModel.dryRunVariable
+        #expect(AppModel.isDryRun(environment: [variable: "1"]))
+        for other in ["0", "", "true", "yes", "11", " 1"] {
+            #expect(!AppModel.isDryRun(environment: [variable: other]))
+        }
+        #expect(!AppModel.isDryRun(environment: [:]))
     }
 }

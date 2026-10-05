@@ -55,13 +55,16 @@ final class FakeAccessibility: AccessibilityChecking {
 
 @MainActor
 final class FakeLaunchAtLogin: LaunchAtLoginControlling {
-    var isEnabled = false
+    var state = LaunchAtLoginState.disabled
     var failure: (any Error)?
+    private(set) var openedSettingsCount = 0
 
     func setEnabled(_ enabled: Bool) throws {
         if let failure { throw failure }
-        isEnabled = enabled
+        state = enabled ? .enabled : .disabled
     }
+
+    func openLoginItemsSettings() { openedSettingsCount += 1 }
 }
 
 @MainActor
@@ -77,13 +80,17 @@ struct AppFixture {
     let accessibility: FakeAccessibility
     let launchAtLogin = FakeLaunchAtLogin()
     let opened = OpenedURLs()
+    let keymapFolder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ghlive-tests-\(UUID().uuidString)", isDirectory: true)
 
-    init(isTrusted: Bool = true) {
+    init(isTrusted: Bool = true, pollInterval: Duration = AppModel.defaultPollInterval) {
         accessibility = FakeAccessibility(isTrusted: isTrusted)
         let urls = opened
         let driver = GuitarDriver(monitor: SilentMonitor(), connector: UnreachableConnector(), sink: sink)
         model = AppModel(
             driver: driver, emitter: RecordingEmitter(), keymap: .default, store: store,
-            accessibility: accessibility, launchAtLogin: launchAtLogin, openURL: { urls.urls.append($0) })
+            keymapFolder: keymapFolder, accessibility: accessibility, launchAtLogin: launchAtLogin,
+            openURL: { urls.urls.append($0) },
+            pollInterval: pollInterval)
     }
 }
