@@ -73,7 +73,7 @@ private struct LiveMonitor: View {
     @ObservedObject var driver: GuitarDriver
 
     var body: some View {
-        MonitorView(monitor: model.monitor)
+        MonitorView(monitor: model.monitor, guitarTest: model.guitarTest)
     }
 }
 

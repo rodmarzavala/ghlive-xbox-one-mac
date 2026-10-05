@@ -127,15 +127,72 @@ enum SampleStates {
                     buttons: [.black2, .black3, .white1, .strumUp, .heroPower], dpad: [.left], whammy: 0.9,
                     tilt: 171, thresholds: thresholds)),
             monitor("monitor-error", status: .error(DongleError.exclusiveAccess.localizedDescription), snapshot: nil),
+            monitor(
+                "monitor-guitar-test", status: .guitarActive, snapshot: halfwayThroughTest.snapshot,
+                test: halfwayThroughTest.model),
+            monitor(
+                "monitor-guitar-test-complete", status: .guitarActive, snapshot: finishedTest.snapshot,
+                test: finishedTest.model),
         ]
     }
 
-    private static func monitor(_ name: String, status: DriverStatus, snapshot: GuitarSnapshot?) -> SampleScreen {
+    // MARK: Guitar test
+
+    private static let sweepTilt: UInt8 = 171
+    private static let restingTilt: UInt8 = 100
+
+    /// A test model that has seen `presses` one after another, then `analog` states.
+    private static func guitarTest(pressing presses: [Control], analog: [GuitarState]) -> GuitarTestModel {
+        let model = GuitarTestModel(thresholds: Keymap.default.thresholds)
+        model.isActive = true
+        let idle = GuitarState(pressedButtons: [], dpad: [], whammy: 0, tilt: restingTilt)
+        for control in presses { model.receive(GuitarSnapshot(state: idle, controls: [control])) }
+        for state in analog { model.receive(GuitarSnapshot(state: state, controls: [])) }
+        return model
+    }
+
+    private static func analogState(whammy: Double, tilt: UInt8) -> GuitarState {
+        GuitarState(pressedButtons: [], dpad: [], whammy: whammy, tilt: tilt)
+    }
+
+    /// Some frets and buttons verified, the whammy bar pressed but not yet released, tilt not tried.
+    private static var halfwayThroughTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
+        let pressed: [Control] = [.black1, .black2, .white1, .white2, .strumUp, .strumDown, .heroPower]
+        let model = guitarTest(
+            pressing: pressed,
+            analog: [
+                analogState(whammy: 0.03, tilt: restingTilt), analogState(whammy: 0.95, tilt: restingTilt),
+            ])
+        let snapshot = snapshot(
+            buttons: [.black3], dpad: [], whammy: 0.95, tilt: restingTilt, thresholds: Keymap.default.thresholds)
+        return (model, snapshot)
+    }
+
+    private static var finishedTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
+        let model = guitarTest(
+            pressing: GuitarTestSession.digitalControls,
+            analog: [
+                analogState(whammy: 0, tilt: restingTilt), analogState(whammy: 1, tilt: sweepTilt),
+                analogState(whammy: 0, tilt: restingTilt),
+            ])
+        let snapshot = snapshot(
+            buttons: [], dpad: [], whammy: 0, tilt: restingTilt, thresholds: Keymap.default.thresholds)
+        return (model, snapshot)
+    }
+
+    private static func monitor(
+        _ name: String, status: DriverStatus, snapshot: GuitarSnapshot?, test: GuitarTestModel? = nil
+    ) -> SampleScreen {
         let presentation = MonitorPresentation(
             status: StatusPresentation(status: status, isPaused: false),
             snapshot: snapshot, thresholds: Keymap.default.thresholds, bindings: Keymap.default.bindings,
             isPaused: false)
-        return SampleScreen(name: name, view: AnyView(MonitorView(monitor: presentation, limitsHeight: false)))
+        return SampleScreen(
+            name: name,
+            view: AnyView(
+                MonitorView(
+                    monitor: presentation, guitarTest: test ?? GuitarTestModel(thresholds: Keymap.default.thresholds),
+                    limitsHeight: false)))
     }
 
     private static func snapshot(
