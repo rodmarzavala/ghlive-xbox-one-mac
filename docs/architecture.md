@@ -41,7 +41,7 @@ GipSession.duePackets(now:) every tick --> keep-alive write
 
 ## Look
 
-On macOS 26 and later the cards, banners and buttons use Liquid Glass; older systems get flat translucent fills. `SurfaceStyle.current` (in `Theme.swift`) is the only switch, and the glass APIs sit behind `#if compiler(>=6.2)` so the package still builds with an older Xcode. `--export-screenshots` renders the classic look, because `ImageRenderer` cannot draw real glass.
+On macOS 26 and later the cards, banners and buttons use Liquid Glass; older systems get flat translucent fills. `SurfaceStyle.current` (in `Theme.swift`) is the only switch, and the glass APIs sit behind `#if compiler(>=6.2)` so the package still builds with an older Xcode (CI builds it on macos-15 with Xcode 16 to prove it). `--export-screenshots` renders the classic look, because `ImageRenderer` cannot draw real glass.
 
 ## Safety guarantees
 

@@ -32,6 +32,21 @@ jobs:
       - name: Lint
         run: make lint
 
+  swift-older-sdk:
+    name: Swift build on the Xcode 16 SDK (classic fallback)
+    runs-on: macos-15
+    env:
+      XCODE_VERSION: "16.4"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+      - name: Toolchain
+        run: swift --version
+      # Without the macOS 26 SDK the glass code is compiled out; this proves the classic fallback still builds.
+      - name: Build
+        run: swift build
+
   python:
     name: Python tools (ruff and unittest)
     runs-on: macos-15
