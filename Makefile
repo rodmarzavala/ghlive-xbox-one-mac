@@ -4,7 +4,7 @@ ifneq (,$(findstring CommandLineTools,$(shell xcode-select -p)))
 TEST_FLAGS := -Xswiftc -plugin-path -Xswiftc $(TESTING_PLUGIN_PATH)
 endif
 
-.PHONY: build test lint release
+.PHONY: build test lint release app
 
 build:
 	swift build
@@ -17,3 +17,6 @@ lint:
 
 release:
 	swift build -c release --arch arm64 --arch x86_64
+
+app:
+	scripts/build-app.sh

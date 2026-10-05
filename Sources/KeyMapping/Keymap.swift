@@ -36,8 +36,6 @@ private enum ThresholdName {
     static let tiltHysteresis = "tilt_hysteresis"
 }
 
-private let tiltMaximum = 255
-
 /// File shape: `{"keys": {"black_1": "1", ...}, "thresholds": {"tilt": 150, ...}}`; `thresholds` is optional.
 private struct KeymapDocument: Codable {
     var keys: [String: String]
@@ -142,8 +140,8 @@ extension Keymap {
             ThresholdName.whammyHysteresis, thresholds.whammyHysteresis, "0 or more and below the whammy threshold"
         )
         try require(
-            (1...tiltMaximum).contains(thresholds.tilt),
-            ThresholdName.tilt, Double(thresholds.tilt), "between 1 and \(tiltMaximum)"
+            (1...Thresholds.tiltMaximum).contains(thresholds.tilt),
+            ThresholdName.tilt, Double(thresholds.tilt), "between 1 and \(Thresholds.tiltMaximum)"
         )
         try require(
             (0..<thresholds.tilt).contains(thresholds.tiltHysteresis),

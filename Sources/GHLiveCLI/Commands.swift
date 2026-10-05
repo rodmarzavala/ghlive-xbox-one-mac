@@ -13,8 +13,6 @@ enum ExitCode {
     static let usage: Int32 = 2
 }
 
-private let terminationSignals = [SIGINT, SIGTERM, SIGHUP]
-
 private func printLine(_ text: String) {
     print(text)
     fflush(stdout)
@@ -91,11 +89,14 @@ private func run(_ options: RunOptions) async -> Int32 {
     }
     let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log)
     let subscription = options.verbose ? reportInput(of: driver) : nil
+    let errorReports = driver.$status.removeDuplicates().compactMap(StatusReporter.line(for:)).sink(
+        receiveValue: printError)
     driver.start()
     printLine("waiting for the dongle (Ctrl-C to quit)")
     await waitForTerminationSignal()
     await driver.stop()
     subscription?.cancel()
+    errorReports.cancel()
     return ExitCode.success
 }
 
@@ -143,34 +144,25 @@ private final class DiscardingSink: OutputSink {
 @MainActor
 private func waitForTerminationSignal() async {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        let resumer = OneShotResumer(continuation)
-        let sources = terminationSignals.map { number -> DispatchSourceSignal in
-            signal(number, SIG_IGN)
-            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-            source.setEventHandler { resumer.resume() }
-            source.resume()
-            return source
-        }
-        resumer.keepAlive(sources)
+        let wait = SignalWait(continuation)
+        wait.observer = TerminationSignalObserver { wait.fire() }
     }
 }
 
-private final class OneShotResumer: @unchecked Sendable {
+/// Resumes once, however many signals arrive.
+@MainActor
+private final class SignalWait {
     private var continuation: CheckedContinuation<Void, Never>?
-    private var sources: [DispatchSourceSignal] = []
+    var observer: TerminationSignalObserver?
 
     init(_ continuation: CheckedContinuation<Void, Never>) {
         self.continuation = continuation
     }
 
-    func keepAlive(_ sources: [DispatchSourceSignal]) {
-        self.sources = sources
-    }
-
-    func resume() {
+    func fire() {
+        observer?.cancel()
+        observer = nil
         continuation?.resume()
         continuation = nil
-        for source in sources { source.cancel() }
-        sources = []
     }
 }
