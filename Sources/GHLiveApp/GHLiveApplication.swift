@@ -78,6 +78,7 @@ private struct LiveMenu: View {
 
     var body: some View {
         MenuContentView(menu: model.menu, actions: actions)
+            .fitsMenuWindowToContent()
     }
 
     private var actions: MenuActions {
