@@ -78,11 +78,56 @@ struct MIDIChartConverterTests {
         #expect(try pressed(ghlTrack(without)).map(\.note) == [ghlOpen + 4])
     }
 
+    @Test("the bare ENHANCED_OPENS text, without brackets, also enables opens")
+    func bareEnhancedOpens() throws {
+        let track = M.track(M.name(Self.guitarName), M.text("ENHANCED_OPENS"), M.note(95), M.endOfTrack())
+        let file = try #require(try convert(source(track)))
+        #expect(try pressed(ghlTrack(file)).map(\.note) == [94])
+    }
+
     @Test("solo, tap and star power markers are kept")
     func markers() throws {
         let track = guitarTrack(M.note(103), M.note(104), M.note(116))
         let file = try #require(try convert(source(track)))
         #expect(try pressed(ghlTrack(file)).map(\.note) == [103, 104, 116])
+    }
+
+    @Test("with no 116 phrases, the GH1/2-era 103 marker becomes Star Power (116)")
+    func legacyStarPower() throws {
+        let file = try #require(try convert(source(guitarTrack(M.note(96), M.note(103, delta: 20)))))
+        #expect(try pressed(ghlTrack(file)).map(\.note) == [98, 116])
+    }
+
+    @Test("when the chart has real 116 phrases, 103 stays a solo marker")
+    func modernStarPowerKept() throws {
+        let file = try #require(try convert(source(guitarTrack(M.note(116), M.note(103, delta: 20)))))
+        #expect(try pressed(ghlTrack(file)).map(\.note) == [116, 103])
+    }
+
+    @Test("song.ini star_power_note or multiplier_note = 116 keeps 103 as a solo, = 103 forces Star Power")
+    func starPowerFromIni() throws {
+        let track = source(guitarTrack(M.note(116), M.note(103, delta: 20)))
+        let legacy = source(guitarTrack(M.note(103, delta: 20)))
+        let keep = ConversionContext(starPowerNote: 116)
+        let force = ConversionContext(starPowerNote: 103)
+        func notes(_ data: Data, _ context: ConversionContext) throws -> [Int] {
+            guard case .converted(let out, _) = try converter.convert(data, context: context) else { return [] }
+            return try pressed(ghlTrack(StandardMIDIFile(data: out))).map(\.note)
+        }
+        #expect(try notes(legacy, keep) == [103])
+        #expect(try notes(track, force) == [116, 116])
+        #expect(try notes(track, .none) == [116, 103])
+    }
+
+    @Test("verification uses the same Star Power rule as the conversion")
+    func verifiesStarPower() throws {
+        let original = source(guitarTrack(M.note(96), M.note(103, delta: 20)))
+        let keep = ConversionContext(starPowerNote: 116)
+        guard case .converted(let out, _) = try converter.convert(original, context: .none) else { return }
+        #expect(try converter.verify(converted: out, original: original, context: .none) == 2)
+        #expect(throws: ConversionError.self) {
+            try converter.verify(converted: out, original: original, context: keep)
+        }
     }
 
     @Test("other notes are dropped but their time is carried: later notes stay where they were")
@@ -215,6 +260,42 @@ struct MIDIChartConverterTests {
             let file = rebuilt(good, replacingChunk: ghlIndex, with: MIDIEvent.encodeTrack(damaged))
             #expect(throws: ConversionError.self) { try converter.verify(converted: file, original: original) }
         }
+    }
+
+    @Test("verification catches stray notes in the 6-fret track, including a White 3 and an unmapped one")
+    func catchesStrayNotes() throws {
+        let original = source(guitarTrack(M.note(96)))
+        let good = try StandardMIDIFile(data: try converted(original))
+        let events = try ghlTrack(good)
+        for stray in [97, 40] {
+            let stray = MIDIEvent(delta: 0, kind: .channel(status: M.noteOnStatus, data: [UInt8(stray), 100]))
+            var extra = events
+            extra.insert(stray, at: extra.count - 1)
+            let file = rebuilt(good, replacingChunk: good.chunks.count - 1, with: MIDIEvent.encodeTrack(extra))
+            #expect(throws: ConversionError.self) { try converter.verify(converted: file, original: original) }
+        }
+    }
+
+    @Test("verification catches a changed header, but not the added track count")
+    func catchesChangedHeader() throws {
+        let original = source(guitarTrack(M.note(96)))
+        let good = try StandardMIDIFile(data: try converted(original))
+        var header = good.chunks[0].body
+        header[5] ^= 0x01
+        let chunks = good.chunks.enumerated().map { M.chunk($1.type, $0 == 0 ? header : $1.body) }
+        #expect(throws: ConversionError.self) {
+            try converter.verify(converted: Data(chunks.flatMap { $0 }), original: original)
+        }
+        #expect(try converter.verify(converted: good.serialized(), original: original) == 1)
+    }
+
+    @Test("note-ons with velocity 0 are releases and are not counted")
+    func releasesNotCounted() throws {
+        let track = M.track(
+            M.name(Self.guitarName), M.noteOn(96), M.noteOn(96, delta: 5, velocity: 0), M.noteOn(97, delta: 5),
+            M.noteOn(97, delta: 5, velocity: 0), M.endOfTrack())
+        let original = source(track)
+        #expect(try converter.verify(converted: try converted(original), original: original) == 2)
     }
 
     @Test("verification catches a changed original track")

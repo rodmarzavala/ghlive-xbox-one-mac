@@ -12,9 +12,11 @@ public enum SongIniChange: Equatable, Sendable {
 
 public enum SongOutcome: Equatable, Sendable {
     case converted(addedTracks: [String], notes: Int, songIni: SongIniChange)
-    case alreadyHasSixFret
+    /// Nothing was converted; `songIni` says whether a missing `diff_guitarghl` was added all the same.
+    case alreadyHasSixFret(songIni: SongIniChange)
     case noFiveFretTrack
     case unsupportedFormat
+    case symbolicLink
     case failed(String)
 }
 
@@ -31,7 +33,7 @@ public struct SongResult: Equatable, Sendable {
     public var isFailure: Bool {
         switch outcome {
         case .failed: true
-        case .converted(_, _, .failed): true
+        case .converted(_, _, .failed), .alreadyHasSixFret(.failed): true
         default: false
         }
     }
@@ -63,7 +65,7 @@ public struct ConversionReport: Equatable, Sendable {
     public var skippedCount: Int {
         results.filter {
             switch $0.outcome {
-            case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat: true
+            case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat, .symbolicLink: true
             case .converted, .failed: false
             }
         }.count

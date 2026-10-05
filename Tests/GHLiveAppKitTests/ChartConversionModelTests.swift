@@ -100,7 +100,7 @@ struct ChartConversionModelTests {
 
     @Test("confirming converts the folder off the main thread and shows the report")
     func confirmed() async {
-        let results = [SongResult(path: "A/notes.chart", outcome: .alreadyHasSixFret)]
+        let results = [SongResult(path: "A/notes.chart", outcome: .alreadyHasSixFret(songIni: .missing))]
         let (model, _, converter, _) = makeModel(picking: songs, converting: .success(report(results: results)))
         model.chooseFolder()
         await model.confirm()

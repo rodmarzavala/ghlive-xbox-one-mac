@@ -72,6 +72,16 @@ struct SongIniPatcherTests {
         #expect(try patcher.patch(Data("[other]\ndiff_guitar = 1\n".utf8)) == .noSongSection)
     }
 
+    @Test("star_power_note and multiplier_note are read from [song], and only when numeric")
+    func starPowerNote() {
+        func note(_ text: String) -> UInt8? { patcher.starPowerNote(in: Data(text.utf8)) }
+        #expect(note("[song]\nstar_power_note = 116\n") == 116)
+        #expect(note("[song]\nMultiplier_Note=103\r\n") == 103)
+        #expect(note("[song]\nstar_power_note = x\n") == nil)
+        #expect(note("[song]\nname = a\n") == nil)
+        #expect(note("[other]\nstar_power_note = 116\n[song]\n") == nil)
+    }
+
     @Test("patching twice adds nothing")
     func idempotent() throws {
         let once = try #require(try patched("[song]\ndiff_guitar = 4\n"))

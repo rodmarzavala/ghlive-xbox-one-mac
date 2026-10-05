@@ -60,10 +60,6 @@ struct ByteReader {
         return bytes[offset]
     }
 
-    func peekByte() -> UInt8? {
-        offset < bytes.count ? bytes[offset] : nil
-    }
-
     mutating func readBytes(_ count: Int, _ what: String) throws -> [UInt8] {
         guard count >= 0, count <= remaining else { throw MIDIError.truncated(what) }
         defer { offset += count }

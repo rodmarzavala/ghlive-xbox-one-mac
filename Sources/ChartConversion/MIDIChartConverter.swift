@@ -7,22 +7,21 @@ public struct MIDIChartConverter: ChartFormatConverter {
     static let enhancedOpensEvent = "[ENHANCED_OPENS]"
     static let supportedFormat = 1
     private static let textMetaTypes: ClosedRange<UInt8> = 0x01...0x07
-    private static let headerTrackCountRange = 2..<4
 
     public init() {}
 
-    public func convert(_ data: Data) throws -> ConversionAttempt {
+    public func convert(_ data: Data, context: ConversionContext) throws -> ConversionAttempt {
         var file = try StandardMIDIFile(data: data)
         guard file.format == Self.supportedFormat else { throw MIDIError.unsupportedFormat(file.format) }
         let names = try file.tracks.map { try $0.name() }
         if names.contains(Self.sixFretTrackName) { return .alreadyHasSixFret }
         guard let index = names.firstIndex(of: Self.fiveFretTrackName) else { return .noFiveFretTrack }
         let source = try file.tracks[index].events()
-        file.appendTrack(events: try Self.sixFretEvents(from: source))
+        file.appendTrack(events: try Self.sixFretEvents(from: source, context: context))
         return .converted(file.serialized(), addedTracks: [Self.sixFretTrackName])
     }
 
-    public func verify(converted: Data, original: Data) throws -> Int {
+    public func verify(converted: Data, original: Data, context: ConversionContext) throws -> Int {
         let output = try StandardMIDIFile(data: converted)
         try Self.verifyOriginalsUntouched(output: output, original: try StandardMIDIFile(data: original))
         let names = try output.tracks.map { try $0.name() }
@@ -31,12 +30,12 @@ public struct MIDIChartConverter: ChartFormatConverter {
         else { throw ConversionError.verificationFailed("the output lacks a guitar track or its 6-fret copy") }
         let five = try output.tracks[fiveIndex].events()
         let six = try output.tracks[sixIndex].events()
-        let map = MIDINoteMap.make(enhancedOpens: Self.hasEnhancedOpens(five))
+        let map = Self.noteMap(for: five, context: context)
         var expected: [UInt8: Int] = [:]
         for (note, count) in Self.pressedCounts(five) {
             if let mapped = map[note] { expected[mapped, default: 0] += count }
         }
-        let actual = Self.pressedCounts(six).filter { Set(map.values).contains($0.key) }
+        let actual = Self.pressedCounts(six)
         guard expected == actual else {
             throw ConversionError.verificationFailed("note counts differ between PART GUITAR and PART GUITAR GHL")
         }
@@ -51,8 +50,8 @@ public struct MIDIChartConverter: ChartFormatConverter {
     /// The notes are mapped, everything else is copied. A dropped note's delta time moves to the next kept
     /// event, so the notes that stay keep their tick and the track keeps its length. Events are written with
     /// an explicit status byte because dropping an event could leave a running status without its source.
-    static func sixFretEvents(from source: [MIDIEvent]) throws -> [MIDIEvent] {
-        let map = MIDINoteMap.make(enhancedOpens: hasEnhancedOpens(source))
+    static func sixFretEvents(from source: [MIDIEvent], context: ConversionContext) throws -> [MIDIEvent] {
+        let map = noteMap(for: source, context: context)
         var converted: [MIDIEvent] = []
         var carried: UInt64 = 0
         for event in source {
@@ -66,6 +65,24 @@ public struct MIDIChartConverter: ChartFormatConverter {
             carried = 0
         }
         return converted
+    }
+
+    private static let forceSoloAsStarPower: UInt8 = 103
+    private static let forceSoloAsSolo: UInt8 = 116
+
+    private static func noteMap(for source: [MIDIEvent], context: ConversionContext) -> [UInt8: UInt8] {
+        MIDINoteMap.make(
+            enhancedOpens: hasEnhancedOpens(source), soloIsStarPower: soloIsStarPower(source, context: context))
+    }
+
+    /// Solo markers count as Star Power when song.ini says so, or by default when the track has no modern
+    /// Star Power phrases on note 116 (mid-format/Tracks/5-Fret-Guitar.md, "Phrase Mechanics").
+    private static func soloIsStarPower(_ source: [MIDIEvent], context: ConversionContext) -> Bool {
+        switch context.starPowerNote {
+        case forceSoloAsStarPower: true
+        case forceSoloAsSolo: false
+        default: pressedCounts(source)[MIDIGuitarMarker.starPower] == nil
+        }
     }
 
     private static func mapped(_ event: MIDIEvent, with map: [UInt8: UInt8]) -> MIDIEvent? {
@@ -110,8 +127,8 @@ public struct MIDIChartConverter: ChartFormatConverter {
         else { throw ConversionError.verificationFailed("an original track changed") }
         var outputHeader = output.chunks[0].body
         var originalHeader = original.chunks[0].body
-        outputHeader.removeSubrange(headerTrackCountRange)
-        originalHeader.removeSubrange(headerTrackCountRange)
+        outputHeader.removeSubrange(StandardMIDIFile.trackCountRange)
+        originalHeader.removeSubrange(StandardMIDIFile.trackCountRange)
         guard outputHeader == originalHeader else { throw ConversionError.verificationFailed("the header changed") }
     }
 

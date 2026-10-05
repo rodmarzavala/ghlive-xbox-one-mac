@@ -227,7 +227,9 @@ enum SampleStates {
             SongResult(
                 path: "Pack One/Another Artist - Another Song/notes.mid",
                 outcome: .converted(addedTracks: ["PART GUITAR GHL"], notes: 3_872, songIni: .alreadyPresent)),
-            SongResult(path: "Pack One/Third Artist - Third Song/notes.chart", outcome: .alreadyHasSixFret),
+            SongResult(
+                path: "Pack One/Third Artist - Third Song/notes.chart",
+                outcome: .alreadyHasSixFret(songIni: .added(value: "2"))),
             SongResult(path: "Pack Two/Fourth Artist - Fourth Song/song.sng", outcome: .unsupportedFormat),
         ]
         if failing {

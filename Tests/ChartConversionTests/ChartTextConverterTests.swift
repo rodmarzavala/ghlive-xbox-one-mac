@@ -93,6 +93,21 @@ struct ChartTextConverterTests {
         #expect(try converter.convert(Data(source.utf8)) == .alreadyHasSixFret)
     }
 
+    @Test("a duplicated 5-fret or 6-fret section is refused, naming it; other duplicates do not matter")
+    func duplicateSections() throws {
+        let five = C.text(difficulties: ["Hard", "Hard"], lines: C.notes([(0, 0)]))
+        #expect(throws: ConversionError.duplicateSection("HardSingle")) { try converter.convert(Data(five.utf8)) }
+        let six = C.section("EasyGHLGuitar", C.notes([(0, 8)]))
+        let doubled = C.text(lines: C.notes([(0, 0)]), extraSections: [six, six])
+        #expect(throws: ConversionError.duplicateSection("EasyGHLGuitar")) { try converter.convert(Data(doubled.utf8)) }
+        #expect(throws: ConversionError.duplicateSection("EasyGHLGuitar")) {
+            try converter.verify(converted: Data(doubled.utf8), original: Data(doubled.utf8))
+        }
+        let events = C.text(
+            lines: C.notes([(0, 0)]), extraSections: [C.section("Events", []), C.section("Events", [])])
+        #expect(try convert(events) != nil)
+    }
+
     @Test("a chart with no lead 5-fret section has nothing to convert")
     func noFiveFret() throws {
         let source = (C.preamble + [C.section("ExpertDoubleBass", C.notes([(0, 0)]))]).joined(separator: "\n")

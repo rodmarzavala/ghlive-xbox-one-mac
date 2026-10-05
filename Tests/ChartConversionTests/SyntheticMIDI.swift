@@ -39,7 +39,11 @@ enum SyntheticMIDI {
     }
 
     static func chunk(_ type: String, _ body: [UInt8]) -> [UInt8] {
-        Array(type.utf8) + be32(body.count) + body
+        chunk(Array(type.utf8), body)
+    }
+
+    static func chunk(_ type: [UInt8], _ body: [UInt8]) -> [UInt8] {
+        type + be32(body.count) + body
     }
 
     static func track(_ events: [UInt8]...) -> [UInt8] {

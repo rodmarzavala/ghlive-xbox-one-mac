@@ -2,11 +2,11 @@ import Foundation
 
 /// A chunk exactly as stored: four-character type and body. Unknown chunk types survive a round trip.
 struct MIDIChunk: Equatable, Sendable {
-    static let headerType = "MThd"
-    static let trackType = "MTrk"
+    static let headerType: [UInt8] = Array("MThd".utf8)
+    static let trackType: [UInt8] = Array("MTrk".utf8)
     static let typeLength = 4
 
-    var type: String
+    var type: [UInt8]
     var body: [UInt8]
 }
 
@@ -34,7 +34,8 @@ struct StandardMIDIFile: Equatable, Sendable {
     private static let minimumHeaderLength = 6
     private static let formatOffset = 0
     private static let trackCountOffset = 2
-    private static let wordLength = 2
+    /// The two header bytes that count the tracks.
+    static let trackCountRange = trackCountOffset..<trackCountOffset + 2
     private static let byteBits = 8
     private static let byteMask = 0xFF
 
@@ -56,9 +57,9 @@ struct StandardMIDIFile: Equatable, Sendable {
 
     private static func readChunk(_ reader: inout ByteReader) throws -> MIDIChunk {
         let typeBytes = try reader.readBytes(MIDIChunk.typeLength, "a chunk type")
-        let type = String(decoding: typeBytes, as: UTF8.self)
         let length = try reader.readUInt32("a chunk length")
-        return MIDIChunk(type: type, body: try reader.readBytes(Int(length), "a \(type) chunk"))
+        let label = String(decoding: typeBytes, as: UTF8.self)
+        return MIDIChunk(type: typeBytes, body: try reader.readBytes(Int(length), "a \(label) chunk"))
     }
 
     var format: Int { word(at: Self.formatOffset) }
@@ -82,7 +83,7 @@ struct StandardMIDIFile: Equatable, Sendable {
     func serialized() -> Data {
         var bytes: [UInt8] = []
         for chunk in chunks {
-            bytes += Array(chunk.type.utf8)
+            bytes += chunk.type
             bytes += Self.bigEndian(UInt32(chunk.body.count))
             bytes += chunk.body
         }

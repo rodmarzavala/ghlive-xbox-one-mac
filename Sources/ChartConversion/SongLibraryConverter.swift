@@ -82,6 +82,11 @@ public struct SongLibraryConverter: Sendable {
     private struct Entry {
         let url: URL
         let isDirectory: Bool
+        let isSymbolicLink: Bool
+        var isLinkedFolder: Bool {
+            isSymbolicLink
+                && (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }
         var name: String { url.lastPathComponent }
     }
 
@@ -99,18 +104,28 @@ public struct SongLibraryConverter: Sendable {
         for file in entries where !file.isDirectory {
             guard let format = Self.format(ofFile: file.name) else { continue }
             let path = Self.join(relativePath, file.name)
-            report(SongResult(path: path, outcome: process(file.url, format, path: path, iniURL: iniURL, run: run)))
+            let outcome =
+                file.isSymbolicLink ? .symbolicLink : process(file.url, format, path: path, iniURL: iniURL, run: run)
+            report(SongResult(path: path, outcome: outcome))
         }
-        for subfolder in entries where subfolder.isDirectory {
-            walk(subfolder.url, relativePath: Self.join(relativePath, subfolder.name), run: run, report: report)
+        for subfolder in entries where subfolder.isDirectory || subfolder.isLinkedFolder {
+            let path = Self.join(relativePath, subfolder.name)
+            if subfolder.isLinkedFolder {
+                report(SongResult(path: path, outcome: .symbolicLink))
+            } else {
+                walk(subfolder.url, relativePath: path, run: run, report: report)
+            }
         }
     }
 
     private func listing(of directory: URL) throws -> [Entry] {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
         let urls = try FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+            at: directory, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])
         return urls.map {
-            Entry(url: $0, isDirectory: (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true)
+            let values = try? $0.resourceValues(forKeys: keys)
+            let isLink = values?.isSymbolicLink == true
+            return Entry(url: $0, isDirectory: !isLink && values?.isDirectory == true, isSymbolicLink: isLink)
         }
         .sorted { $0.name < $1.name }
     }
@@ -141,11 +156,14 @@ public struct SongLibraryConverter: Sendable {
         guard let converter = converters[format] else { return .failed("no converter for this format") }
         do {
             let original = try store.read(url)
-            switch try converter.convert(original) {
-            case .alreadyHasSixFret: return .alreadyHasSixFret
+            let context = starPowerContext(iniURL)
+            switch try converter.convert(original, context: context) {
+            case .alreadyHasSixFret:
+                return .alreadyHasSixFret(songIni: patchIni(iniURL, besides: path, run: run))
             case .noFiveFretTrack: return .noFiveFretTrack
             case .converted(let data, let added):
-                let notes = try apply(data, over: url, original: original, path: path, converter: converter, run: run)
+                let notes = try apply(
+                    data, over: url, original: original, path: path, converter: converter, context: context, run: run)
                 let ini = patchIni(iniURL, besides: path, run: run)
                 return .converted(addedTracks: added, notes: notes, songIni: ini)
             }
@@ -156,11 +174,15 @@ public struct SongLibraryConverter: Sendable {
 
     /// Verifies the conversion and, unless this is a dry run, backs the original up and replaces it.
     private func apply(
-        _ data: Data, over url: URL, original: Data, path: String, converter: any ChartFormatConverter, run: Run
+        _ data: Data, over url: URL, original: Data, path: String, converter: any ChartFormatConverter,
+        context: ConversionContext, run: Run
     ) throws -> Int {
-        guard !run.dryRun else { return try converter.verify(converted: data, original: original) }
+        func verify(_ converted: Data) throws -> Int {
+            try converter.verify(converted: converted, original: original, context: context)
+        }
+        guard !run.dryRun else { return try verify(data) }
         try backUp(url, path: path, run: run)
-        return try writeVerified(data, over: url) { try converter.verify(converted: $0, original: original) }
+        return try writeVerified(data, over: url, verify: verify)
     }
 
     private func backUp(_ url: URL, path: String, run: Run) throws {
@@ -182,6 +204,11 @@ public struct SongLibraryConverter: Sendable {
 
     // MARK: song.ini
 
+    private func starPowerContext(_ iniURL: URL?) -> ConversionContext {
+        guard let iniURL, let ini = try? store.read(iniURL) else { return .none }
+        return ConversionContext(starPowerNote: iniPatcher.starPowerNote(in: ini))
+    }
+
     private func patchIni(_ iniURL: URL?, besides chartPath: String, run: Run) -> SongIniChange {
         guard let iniURL else { return .missing }
         do {
@@ -201,7 +228,12 @@ public struct SongLibraryConverter: Sendable {
     private func writeIni(_ data: Data, over url: URL, original: Data, chartPath: String, run: Run) throws {
         let folder = (chartPath as NSString).deletingLastPathComponent
         let path = Self.join(folder, url.lastPathComponent)
-        if !store.exists(run.backupFolder.appendingPathComponent(path)) { try backUp(url, path: path, run: run) }
+        let saved = run.backupFolder.appendingPathComponent(path)
+        if store.exists(saved) {
+            run.backupWasUsed = true
+        } else {
+            try backUp(url, path: path, run: run)
+        }
         _ = try writeVerified(data, over: url) { try iniPatcher.verify(patched: $0, original: original) }
     }
 }

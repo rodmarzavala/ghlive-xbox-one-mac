@@ -15,7 +15,6 @@ struct MIDIEvent: Equatable, Sendable {
     static let trackNameType: UInt8 = 0x03
     static let firstStatusByte: UInt8 = 0x80
     static let firstSystemStatus: UInt8 = 0xF0
-    static let channelMask: UInt8 = 0x0F
     static let typeMask: UInt8 = 0xF0
     static let programChangeType: UInt8 = 0xC0
     static let channelPressureType: UInt8 = 0xD0

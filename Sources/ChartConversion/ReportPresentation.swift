@@ -10,7 +10,7 @@ extension SongResult {
     public func headline(dryRun: Bool) -> String {
         switch outcome {
         case .converted: dryRun ? "would convert" : "converted"
-        case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat: "skipped"
+        case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat, .symbolicLink: "skipped"
         case .failed: "failed"
         }
     }
@@ -19,7 +19,9 @@ extension SongResult {
         switch outcome {
         case .converted(let added, let notes, let songIni):
             "added \(added.joined(separator: ", ")); \(notes) notes verified; \(songIni.text)"
-        case .alreadyHasSixFret: "already has a 6-fret track"
+        case .alreadyHasSixFret(let songIni):
+            ["already has a 6-fret track", songIni.reportedText].compactMap { $0 }.joined(separator: "; ")
+        case .symbolicLink: "symbolic link"
         case .noFiveFretTrack: "no 5-fret guitar track"
         case .unsupportedFormat: ".sng is not supported yet"
         case .failed(let reason): reason
@@ -28,6 +30,14 @@ extension SongResult {
 }
 
 extension SongIniChange {
+    /// Only what changed or went wrong: a skipped song stays quiet about an ini that needed nothing.
+    fileprivate var reportedText: String? {
+        switch self {
+        case .added, .failed: text
+        case .alreadyPresent, .missing: nil
+        }
+    }
+
     fileprivate var text: String {
         switch self {
         case .added(let value): "song.ini: added diff_guitarghl = \(value)"

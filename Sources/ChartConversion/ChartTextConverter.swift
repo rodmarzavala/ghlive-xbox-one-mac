@@ -4,14 +4,12 @@ import Foundation
 /// has no 6-fret counterpart. The 5-fret sections are never touched.
 public struct ChartTextConverter: ChartFormatConverter {
     private static let byteOrderMark = "\u{FEFF}"
-    private static let lineFeed: Character = "\n"
-    private static let carriageReturn: Character = "\r"
 
     public init() {}
 
-    public func convert(_ data: Data) throws -> ConversionAttempt {
+    public func convert(_ data: Data, context: ConversionContext) throws -> ConversionAttempt {
         let text = try Self.decode(data)
-        let sections = ChartText.lookup(ChartText.sections(of: text))
+        let sections = try ChartText.guitarSections(ChartText.sections(of: text))
         let missing = GuitarDifficulty.allCases.filter {
             sections[$0.fiveFretSection] != nil && sections[$0.sixFretSection] == nil
         }
@@ -31,14 +29,14 @@ public struct ChartTextConverter: ChartFormatConverter {
         return .converted(Data(converted.utf8), addedTracks: missing.map(\.sixFretSection))
     }
 
-    public func verify(converted: Data, original: Data) throws -> Int {
+    public func verify(converted: Data, original: Data, context: ConversionContext) throws -> Int {
         let text = try Self.decode(converted)
         // Bytes, not Characters: a lone CR is not a prefix of the CRLF grapheme that follows it.
         let kept = Self.trimmingTrailingLineFeeds(try Self.decode(original))
         guard Array(text.utf8).starts(with: Array(kept.utf8)) else {
             throw ConversionError.verificationFailed("the original chart content changed")
         }
-        let sections = ChartText.lookup(ChartText.sections(of: text))
+        let sections = try ChartText.guitarSections(ChartText.sections(of: text))
         var total = 0
         for difficulty in GuitarDifficulty.allCases {
             guard let five = sections[difficulty.fiveFretSection] else { continue }

@@ -3,12 +3,7 @@ import Foundation
 /// MIDI note numbers of the lead guitar tracks.
 /// Specs: mid-format/Tracks/5-Fret-Guitar.md (`PART GUITAR`) and mid-format/Tracks/6-Fret-Guitar.md
 /// (`PART GUITAR GHL`), "Track Notes".
-enum MIDIGuitarDifficulty: CaseIterable {
-    case expert
-    case hard
-    case medium
-    case easy
-
+extension GuitarDifficulty {
     /// The Green note; Red, Yellow, Blue and Orange follow one semitone apart. The Open note is one below.
     var fiveFretGreen: UInt8 {
         switch self {
@@ -45,7 +40,6 @@ enum MIDIGuitarMarker {
     static let solo: UInt8 = 103
     static let tap: UInt8 = 104
     static let starPower: UInt8 = 116
-    static let all: [UInt8] = [solo, tap, starPower]
 }
 
 enum MIDINoteMap {
@@ -59,16 +53,21 @@ enum MIDINoteMap {
     /// vocals harmonies, trill lanes and the like, which would otherwise play as notes.
     /// `enhancedOpens` maps the 5-fret open note (Green - 1), which only counts as a note when the track
     /// carries the `[ENHANCED_OPENS]` text event.
-    static func make(enhancedOpens: Bool) -> [UInt8: UInt8] {
+    /// `soloIsStarPower`: the chart uses the GH1/2-era Star Power on note 103
+    /// (mid-format/Tracks/5-Fret-Guitar.md, "Phrase Mechanics"), so it becomes the 6-fret Star Power note 116
+    /// instead of a solo marker.
+    static func make(enhancedOpens: Bool, soloIsStarPower: Bool) -> [UInt8: UInt8] {
         var map: [UInt8: UInt8] = [:]
-        for difficulty in MIDIGuitarDifficulty.allCases {
+        for difficulty in GuitarDifficulty.allCases {
             let green = difficulty.fiveFretGreen
             let open = difficulty.sixFretOpen
             for (lane, target) in laneTargets.enumerated() { map[green + UInt8(lane)] = open + target.rawValue }
             for force in [forceHOPOOffset, forceStrumOffset] { map[green + force] = green + force }
             if enhancedOpens { map[green - 1] = open + SixFretMIDIOffset.open.rawValue }
         }
-        for marker in MIDIGuitarMarker.all { map[marker] = marker }
+        map[MIDIGuitarMarker.solo] = soloIsStarPower ? MIDIGuitarMarker.starPower : MIDIGuitarMarker.solo
+        map[MIDIGuitarMarker.tap] = MIDIGuitarMarker.tap
+        map[MIDIGuitarMarker.starPower] = MIDIGuitarMarker.starPower
         return map
     }
 }

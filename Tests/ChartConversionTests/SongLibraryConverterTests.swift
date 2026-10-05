@@ -164,7 +164,7 @@ struct SongLibraryConverterTests {
         let afterFirst = try library.snapshot()
         let backups = try library.backupFolders().count
         let report = try makeConverter().convert(folder: library.root, dryRun: false)
-        #expect(outcomes(report).values.allSatisfy { $0 == .alreadyHasSixFret })
+        #expect(outcomes(report).values.allSatisfy { $0 == .alreadyHasSixFret(songIni: .missing) })
         #expect(try library.snapshot() == afterFirst)
         #expect(try library.backupFolders().count == backups)
     }
@@ -215,6 +215,114 @@ struct SongLibraryConverterTests {
         #expect(try library.read("A/notes.mid") == crafted)
     }
 
+    // MARK: Star Power from song.ini
+
+    @Test("star_power_note in song.ini reaches the MIDI conversion")
+    func starPowerFromIni() throws {
+        typealias M = SyntheticMIDI
+        let mid = M.file([M.track(M.name("PART GUITAR"), M.note(96), M.note(103, delta: 10), M.endOfTrack())])
+        func converted(ini: String?) throws -> [Int] {
+            let library = try SyntheticLibrary()
+            try library.write(mid, "A/notes.mid")
+            if let ini { try library.write(Data(ini.utf8), "A/song.ini") }
+            _ = try makeConverter().convert(folder: library.root, dryRun: false)
+            let file = try StandardMIDIFile(data: library.read("A/notes.mid"))
+            let events = try #require(file.tracks.last).events()
+            return events.compactMap {
+                if case .channel(M.noteOnStatus, let data) = $0.kind { Int(data[0]) } else { nil }
+            }
+        }
+        #expect(try converted(ini: nil) == [98, 116])
+        #expect(try converted(ini: "[song]\nstar_power_note = 116\n") == [98, 103])
+        #expect(try converted(ini: "[song]\nmultiplier_note = 116\n") == [98, 103])
+        #expect(try converted(ini: "[song]\nstar_power_note = 103\n") == [98, 116])
+    }
+
+    // MARK: song.ini of songs that already have 6-fret tracks
+
+    @Test("a song that already has a 6-fret track still gets the missing diff_guitarghl, with a backup")
+    func iniRepairedForAlreadyConverted() throws {
+        let library = try SyntheticLibrary()
+        let sixFret = Data(
+            SyntheticChart.text(
+                lines: SyntheticChart.notes([(0, 0)]),
+                extraSections: [SyntheticChart.section("ExpertGHLGuitar", SyntheticChart.notes([(0, 8)]))]
+            ).utf8)
+        try library.write(sixFret, "A/notes.chart")
+        try library.write(SyntheticSongs.ini, "A/song.ini")
+        let report = try makeConverter().convert(folder: library.root, dryRun: false)
+        #expect(outcomes(report)["A/notes.chart"] == .alreadyHasSixFret(songIni: .added(value: "4")))
+        #expect(try library.read("A/notes.chart") == sixFret)
+        #expect(String(decoding: try library.read("A/song.ini"), as: UTF8.self).contains("diff_guitarghl = 4\n"))
+        let backup = try #require(report.backupFolder)
+        #expect(try Data(contentsOf: backup.appendingPathComponent("A/song.ini")) == SyntheticSongs.ini)
+        #expect(report.skippedCount == 1)
+    }
+
+    @Test("a dry run reports the ini repair and writes nothing")
+    func iniRepairDryRun() throws {
+        let library = try SyntheticLibrary()
+        let sixFret = Data(
+            SyntheticChart.text(
+                lines: SyntheticChart.notes([(0, 0)]),
+                extraSections: [SyntheticChart.section("ExpertGHLGuitar", SyntheticChart.notes([(0, 8)]))]
+            ).utf8)
+        try library.write(sixFret, "A/notes.chart")
+        try library.write(SyntheticSongs.ini, "A/song.ini")
+        let before = try library.snapshot()
+        let report = try makeConverter().convert(folder: library.root, dryRun: true)
+        #expect(outcomes(report)["A/notes.chart"] == .alreadyHasSixFret(songIni: .added(value: "4")))
+        #expect(try library.snapshot() == before)
+    }
+
+    @Test("a run after a failed ini patch recovers; the ini backup that already exists is not copied again")
+    func iniRecovery() throws {
+        let library = try SyntheticLibrary()
+        try library.write(SyntheticSongs.fiveFretChart, "A/notes.chart")
+        try library.write(SyntheticSongs.ini, "A/song.ini")
+        let first = try makeConverter(store: IniFailingStore()).convert(folder: library.root, dryRun: false)
+        #expect(first.hasFailures)
+        #expect(try library.read("A/song.ini") == SyntheticSongs.ini)
+        // Same clock, so the second run uses the same backup folder, where the ini copy already is.
+        let second = try makeConverter().convert(folder: library.root, dryRun: false)
+        #expect(outcomes(second)["A/notes.chart"] == .alreadyHasSixFret(songIni: .added(value: "4")))
+        #expect(!second.hasFailures)
+        #expect(String(decoding: try library.read("A/song.ini"), as: UTF8.self).contains("diff_guitarghl = 4\n"))
+        let backup = try #require(second.backupFolder)
+        #expect(try Data(contentsOf: backup.appendingPathComponent("A/song.ini")) == SyntheticSongs.ini)
+    }
+
+    // MARK: Duplicates and symbolic links
+
+    @Test("a chart with a duplicated 5-fret section is refused, naming the section")
+    func duplicateSection() throws {
+        let library = try SyntheticLibrary()
+        let text = SyntheticChart.text(difficulties: ["Expert", "Expert"], lines: SyntheticChart.notes([(0, 0)]))
+        try library.write(Data(text.utf8), "A/notes.chart")
+        let report = try makeConverter().convert(folder: library.root, dryRun: false)
+        #expect(outcomes(report) == ["A/notes.chart": .failed("duplicate [ExpertSingle]")])
+        #expect(try library.read("A/notes.chart") == Data(text.utf8))
+    }
+
+    @Test("symbolic links to charts and to folders are reported and not followed")
+    func symbolicLinks() throws {
+        let library = try SyntheticLibrary()
+        let outside = library.parent.appendingPathComponent("Elsewhere")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let target = outside.appendingPathComponent("notes.chart")
+        try SyntheticSongs.fiveFretChart.write(to: target)
+        try FileManager.default.createDirectory(
+            at: library.root.appendingPathComponent("A"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: library.root.appendingPathComponent("A/notes.chart"), withDestinationURL: target)
+        try FileManager.default.createSymbolicLink(
+            at: library.root.appendingPathComponent("Linked"), withDestinationURL: outside)
+        let report = try makeConverter().convert(folder: library.root, dryRun: false)
+        #expect(outcomes(report) == ["A/notes.chart": .symbolicLink, "Linked": .symbolicLink])
+        #expect(try Data(contentsOf: target) == SyntheticSongs.fiveFretChart)
+        #expect(report.skippedCount == 2)
+    }
+
     @Test("results are delivered one by one, in a stable order")
     func progress() throws {
         let library = try SyntheticLibrary()
@@ -242,8 +350,10 @@ struct SongLibraryConverterTests {
     /// Passes conversion through but reports a verification failure, as a damaged write would.
     private struct FailingVerifier: ChartFormatConverter {
         let inner: any ChartFormatConverter
-        func convert(_ data: Data) throws -> ConversionAttempt { try inner.convert(data) }
-        func verify(converted: Data, original: Data) throws -> Int {
+        func convert(_ data: Data, context: ConversionContext) throws -> ConversionAttempt {
+            try inner.convert(data, context: context)
+        }
+        func verify(converted: Data, original: Data, context: ConversionContext) throws -> Int {
             throw ConversionError.verificationFailed("injected")
         }
     }

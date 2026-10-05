@@ -98,8 +98,15 @@ enum ChartText {
         return name.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" } ? String(name) : nil
     }
 
-    /// The last section of that name wins, as in the prototype's dictionary.
-    static func lookup(_ sections: [ChartSection]) -> [String: ChartSection] {
-        Dictionary(sections.map { ($0.name, $0) }, uniquingKeysWith: { _, later in later })
+    /// The lead guitar sections by name. A name that appears twice is refused rather than guessing which
+    /// copy is the real one.
+    static func guitarSections(_ sections: [ChartSection]) throws -> [String: ChartSection] {
+        let names = Set(GuitarDifficulty.allCases.flatMap { [$0.fiveFretSection, $0.sixFretSection] })
+        var found: [String: ChartSection] = [:]
+        for section in sections where names.contains(section.name) {
+            guard found[section.name] == nil else { throw ConversionError.duplicateSection(section.name) }
+            found[section.name] = section
+        }
+        return found
     }
 }

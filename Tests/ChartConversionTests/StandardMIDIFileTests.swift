@@ -47,6 +47,12 @@ struct StandardMIDIFileTests {
         #expect(parsed.serialized() == data)
     }
 
+    @Test("a chunk type that is not valid UTF-8 round-trips byte for byte")
+    func binaryChunkType() throws {
+        let data = M.file([busyTrack, M.chunk([0xFF, 0xFE, 0x80, 0x81], [1, 2])])
+        #expect(try StandardMIDIFile(data: data).serialized() == data)
+    }
+
     @Test("bytes after the last chunk are kept")
     func trailingBytes() throws {
         let data = M.file([busyTrack]) + Data([0x00, 0x01])

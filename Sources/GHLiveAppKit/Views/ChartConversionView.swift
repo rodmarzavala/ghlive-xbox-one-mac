@@ -181,18 +181,14 @@ private struct SongRow: View {
     }
 
     private var symbol: String {
-        switch result.outcome {
-        case .converted where result.isFailure, .failed: "xmark.octagon.fill"
-        case .converted: "checkmark.circle.fill"
-        case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat: "minus.circle"
-        }
+        if result.isFailure { return "xmark.octagon.fill" }
+        if case .converted = result.outcome { return "checkmark.circle.fill" }
+        return "minus.circle"
     }
 
     private var color: Color {
-        switch result.outcome {
-        case .converted where result.isFailure, .failed: .red
-        case .converted: .green
-        case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat: .secondary
-        }
+        if result.isFailure { return .red }
+        if case .converted = result.outcome { return .green }
+        return .secondary
     }
 }

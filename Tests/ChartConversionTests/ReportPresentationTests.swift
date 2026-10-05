@@ -35,7 +35,7 @@ struct ReportPresentationTests {
     @Test("skips and failures read plainly")
     func others() {
         #expect(
-            result(.alreadyHasSixFret).line(dryRun: false)
+            result(.alreadyHasSixFret(songIni: .missing)).line(dryRun: false)
                 == "skipped: Pack/Song/notes.chart (already has a 6-fret track)")
         #expect(
             result(.noFiveFretTrack).line(dryRun: false) == "skipped: Pack/Song/notes.chart (no 5-fret guitar track)")
@@ -45,10 +45,21 @@ struct ReportPresentationTests {
         #expect(result(.failed("boom")).line(dryRun: false) == "failed: Pack/Song/notes.chart (boom)")
     }
 
+    @Test("a skipped song says when its song.ini was repaired, and a symbolic link is named")
+    func skippedDetails() {
+        let repaired = result(.alreadyHasSixFret(songIni: .added(value: "2")))
+        #expect(
+            repaired.line(dryRun: false)
+                == "skipped: Pack/Song/notes.chart (already has a 6-fret track; song.ini: added diff_guitarghl = 2)")
+        #expect(result(.alreadyHasSixFret(songIni: .failed("disk full"))).isFailure)
+        #expect(result(.symbolicLink).line(dryRun: false) == "skipped: Pack/Song/notes.chart (symbolic link)")
+    }
+
     @Test("the summary counts each kind, and says whether it was a dry run")
     func summary() {
         let results = [
-            result(.converted(addedTracks: ["X"], notes: 1, songIni: .missing)), result(.alreadyHasSixFret),
+            result(.converted(addedTracks: ["X"], notes: 1, songIni: .missing)),
+            result(.alreadyHasSixFret(songIni: .missing)),
             result(.unsupportedFormat), result(.failed("x")),
         ]
         let root = URL(fileURLWithPath: "/songs")

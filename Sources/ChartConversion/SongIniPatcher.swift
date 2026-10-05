@@ -17,6 +17,7 @@ public struct SongIniPatcher: Sendable {
     static let sixFretKey = "diff_guitarghl"
     static let fiveFretKey = "diff_guitar"
     static let defaultValue = "0"
+    private static let starPowerKeys: Set<String> = ["star_power_note", "multiplier_note"]
     private static let byteOrderMark = "\u{EF}\u{BB}\u{BF}"
 
     public init() {}
@@ -40,6 +41,15 @@ public struct SongIniPatcher: Sendable {
             patched.insert(newLine + lineBreak, at: insertAfter + 1)
         }
         return .updated(Self.data(patched.joined()), value: value)
+    }
+
+    /// `star_power_note` or `multiplier_note` of the `[song]` section, when it holds a number.
+    public func starPowerNote(in data: Data) -> UInt8? {
+        let lines = Self.lines(of: Self.text(data))
+        guard let section = Self.songSection(in: lines) else { return nil }
+        let values = section.compactMap { Self.keyValue(of: lines[$0]) }
+            .filter { Self.starPowerKeys.contains($0.key) }
+        return values.lazy.compactMap { UInt8($0.value) }.first
     }
 
     /// Checks that `patched` is `original` plus one `diff_guitarghl` line and returns that line's value.
