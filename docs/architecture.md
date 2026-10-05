@@ -39,6 +39,10 @@ GipSession.duePackets(now:) every tick --> keep-alive write
 - Reads and writes are asynchronous (`enqueueIORequest`). Interrupt pipes require `completionTimeout: 0`, so a request on a wedged pipe has no timeout of its own: the driver ends it by closing the transport when its task is cancelled (`stop()`, dongle removal), which aborts the pending I/O. The read stream keeps only the newest 64 transfers, so a stalled consumer never replays stale input.
 - Per connection the driver runs a reader task and a tick task (keep-alive and guitar-silence check). Cancelling the driver task tears both down, closes the dongle and releases all keys.
 
+## Look
+
+On macOS 26 and later the cards, banners and buttons use Liquid Glass; older systems get flat translucent fills. `SurfaceStyle.current` (in `Theme.swift`) is the only switch, and the glass APIs sit behind `#if compiler(>=6.2)` so the package still builds with an older Xcode. `--export-screenshots` renders the classic look, because `ImageRenderer` cannot draw real glass.
+
 ## Safety guarantees
 
 `OutputSink.releaseAll()` runs, on the main actor, on stop, on disconnect or read failure, on pause, and when the guitar has been silent for more than one second. `KeyboardSink` marks a key as pressed before posting its key down and forgets it only after its key up, so a release arriving in between still lifts the key.

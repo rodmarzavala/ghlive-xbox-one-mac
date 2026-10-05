@@ -127,6 +127,7 @@ Other useful commands:
 swift scripts/make-icon.swift Resources/AppIcon.icns   # regenerate the app icon
 GHLIVE_DRY_RUN=1 swift run GHLiveApp                    # GUI that posts no keys
 swift run GHLiveApp --export-screenshots <dir>          # render the UI states to PNG files
+GHLIVE_DRY_RUN=1 swift run GHLiveApp --open-window settings   # also: monitor; opens that window at launch
 ```
 
 You are encouraged to compare the contents of your locally built zip with the release. The binaries will not be bit-identical, but you can compare the file list and `Info.plist`.
