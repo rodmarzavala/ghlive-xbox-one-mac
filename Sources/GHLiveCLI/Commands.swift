@@ -141,34 +141,25 @@ private final class DiscardingSink: OutputSink {
 @MainActor
 private func waitForTerminationSignal() async {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        let resumer = OneShotResumer(continuation)
-        let sources = TerminationSignals.all.map { number -> DispatchSourceSignal in
-            signal(number, SIG_IGN)
-            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-            source.setEventHandler { resumer.resume() }
-            source.resume()
-            return source
-        }
-        resumer.keepAlive(sources)
+        let wait = SignalWait(continuation)
+        wait.observer = TerminationSignalObserver { wait.fire() }
     }
 }
 
-private final class OneShotResumer: @unchecked Sendable {
+/// Resumes once, however many signals arrive.
+@MainActor
+private final class SignalWait {
     private var continuation: CheckedContinuation<Void, Never>?
-    private var sources: [DispatchSourceSignal] = []
+    var observer: TerminationSignalObserver?
 
     init(_ continuation: CheckedContinuation<Void, Never>) {
         self.continuation = continuation
     }
 
-    func keepAlive(_ sources: [DispatchSourceSignal]) {
-        self.sources = sources
-    }
-
-    func resume() {
+    func fire() {
+        observer?.cancel()
+        observer = nil
         continuation?.resume()
         continuation = nil
-        for source in sources { source.cancel() }
-        sources = []
     }
 }
