@@ -17,7 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
-        signalObserver = TerminationSignalObserver { NSApp.terminate(nil) }
+        // Not NSApp.terminate: its .terminateLater wait spins a nested run loop inside this main-queue block,
+        // and the serial main queue then never runs the shutdown tasks, so the app would hang. terminate(reply:)
+        // releases the keys at once and gives up after its timeout, which is the watchdog.
+        signalObserver = TerminationSignalObserver { [model] in model.terminate { exit(0) } }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
