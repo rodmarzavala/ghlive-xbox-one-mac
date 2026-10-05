@@ -84,7 +84,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-tags: true
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
@@ -106,7 +105,8 @@ jobs:
         run: |
           tag="v${VERSION}"
           # A tag that already exists must point at the commit that was built and attested.
-          if tag_commit="$(git rev-parse --verify --quiet "refs/tags/${tag}^{commit}")"; then
+          # Resolved through the API: checkout's fetch-tags fails on tag-triggered runs ("Cannot fetch both").
+          if tag_commit="$(gh api "repos/${GH_REPO}/commits/${tag}" --jq .sha 2>/dev/null)"; then
             if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
               echo "::error::Tag ${tag} points at ${tag_commit}, not at the built commit ${GITHUB_SHA}. Refusing to publish."
               exit 1
