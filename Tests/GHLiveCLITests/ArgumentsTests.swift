@@ -1,5 +1,6 @@
 import GHLiveCore
 import GuitarInput
+import KeyMapping
 import Testing
 
 @testable import GHLiveCLI
@@ -46,9 +47,32 @@ struct ArgumentsTests {
         }
     }
 
+    @Test("keymap --print-preset takes a preset name", arguments: KeymapPreset.allCases)
+    func keymapPrintPreset(preset: KeymapPreset) throws {
+        #expect(try parseArguments(["keymap", "--print-preset", preset.rawValue]) == .printKeymap(preset))
+    }
+
+    @Test("keymap --print-preset rejects a missing or unknown name")
+    func keymapPrintPresetErrors() {
+        #expect(throws: ArgumentError.missingValue("--print-preset")) {
+            try parseArguments(["keymap", "--print-preset"])
+        }
+        #expect(throws: ArgumentError.invalidValue("seven-fret", option: "--print-preset")) {
+            try parseArguments(["keymap", "--print-preset", "seven-fret"])
+        }
+        #expect(throws: ArgumentError.unknownOption("extra", command: "keymap")) {
+            try parseArguments(["keymap", "--print-preset", "five-fret", "extra"])
+        }
+    }
+
+    @Test("the usage text lists every preset")
+    func usageListsPresets() {
+        for preset in KeymapPreset.allCases { #expect(usage.contains(preset.rawValue)) }
+    }
+
     @Test("keymap --print-default")
     func keymapPrintDefault() throws {
-        #expect(try parseArguments(["keymap", "--print-default"]) == .printDefaultKeymap)
+        #expect(try parseArguments(["keymap", "--print-default"]) == .printKeymap(.sixFret))
         #expect(throws: ArgumentError.self) { try parseArguments(["keymap"]) }
         #expect(throws: ArgumentError.unknownOption("--bogus", command: "keymap")) {
             try parseArguments(["keymap", "--bogus"])

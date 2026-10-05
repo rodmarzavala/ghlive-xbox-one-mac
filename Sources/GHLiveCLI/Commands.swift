@@ -42,8 +42,8 @@ func execute(_ command: Command) async -> Int32 {
     case .help:
         printLine(usage)
         return ExitCode.success
-    case .printDefaultKeymap:
-        return printDefaultKeymap()
+    case .printKeymap(let preset):
+        return printKeymap(preset)
     case .run(let options):
         return await run(options)
     case .sniff:
@@ -51,12 +51,12 @@ func execute(_ command: Command) async -> Int32 {
     }
 }
 
-private func printDefaultKeymap() -> Int32 {
+private func printKeymap(_ preset: KeymapPreset) -> Int32 {
     do {
-        printLine(String(decoding: try Keymap.default.jsonData(), as: UTF8.self))
+        printLine(String(decoding: try preset.keymap.jsonData(), as: UTF8.self))
         return ExitCode.success
     } catch {
-        printError("cannot encode the default keymap: \(error)")
+        printError("cannot encode the \(preset.rawValue) keymap: \(error)")
         return ExitCode.failure
     }
 }
