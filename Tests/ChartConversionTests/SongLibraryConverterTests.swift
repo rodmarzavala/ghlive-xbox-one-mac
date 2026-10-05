@@ -197,6 +197,24 @@ struct SongLibraryConverterTests {
         #expect(try library.read("A/notes.mid") == Data("not a midi".utf8))
     }
 
+    @Test("a .mid whose delta times overflow fails that song, and a later song still converts")
+    func deltaOverflowIsolated() throws {
+        typealias M = SyntheticMIDI
+        let maxDelta = Int(VariableLengthQuantity.maxValue)
+        let dropped = (0..<20).flatMap { _ in M.note(40, delta: maxDelta, length: 0) }
+        let crafted = M.file([M.track(M.name("PART GUITAR"), dropped, M.note(96), M.endOfTrack())])
+        let library = try SyntheticLibrary()
+        try library.write(crafted, "A/notes.mid")
+        try library.write(SyntheticSongs.fiveFretChart, "B/notes.chart")
+        let report = try makeConverter().convert(folder: library.root, dryRun: false)
+        guard case .failed = outcomes(report)["A/notes.mid"] else {
+            Issue.record("expected a failure")
+            return
+        }
+        #expect(isConverted(outcomes(report)["B/notes.chart"]))
+        #expect(try library.read("A/notes.mid") == crafted)
+    }
+
     @Test("results are delivered one by one, in a stable order")
     func progress() throws {
         let library = try SyntheticLibrary()

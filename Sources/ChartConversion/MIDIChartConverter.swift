@@ -18,7 +18,7 @@ public struct MIDIChartConverter: ChartFormatConverter {
         if names.contains(Self.sixFretTrackName) { return .alreadyHasSixFret }
         guard let index = names.firstIndex(of: Self.fiveFretTrackName) else { return .noFiveFretTrack }
         let source = try file.tracks[index].events()
-        file.appendTrack(events: Self.sixFretEvents(from: source))
+        file.appendTrack(events: try Self.sixFretEvents(from: source))
         return .converted(file.serialized(), addedTracks: [Self.sixFretTrackName])
     }
 
@@ -51,16 +51,18 @@ public struct MIDIChartConverter: ChartFormatConverter {
     /// The notes are mapped, everything else is copied. A dropped note's delta time moves to the next kept
     /// event, so the notes that stay keep their tick and the track keeps its length. Events are written with
     /// an explicit status byte because dropping an event could leave a running status without its source.
-    static func sixFretEvents(from source: [MIDIEvent]) -> [MIDIEvent] {
+    static func sixFretEvents(from source: [MIDIEvent]) throws -> [MIDIEvent] {
         let map = MIDINoteMap.make(enhancedOpens: hasEnhancedOpens(source))
         var converted: [MIDIEvent] = []
-        var carried: UInt32 = 0
+        var carried: UInt64 = 0
         for event in source {
             guard let kept = mapped(event, with: map) else {
-                carried += event.delta
+                carried += UInt64(event.delta)
                 continue
             }
-            converted.append(kept.withDelta(kept.delta + carried).withExplicitStatus())
+            let delta = UInt64(kept.delta) + carried
+            guard delta <= UInt64(VariableLengthQuantity.maxValue) else { throw MIDIError.deltaTooLarge }
+            converted.append(kept.withDelta(UInt32(delta)).withExplicitStatus())
             carried = 0
         }
         return converted

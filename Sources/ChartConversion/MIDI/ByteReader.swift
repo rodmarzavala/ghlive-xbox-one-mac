@@ -7,6 +7,7 @@ public enum MIDIError: Error, Equatable, Sendable, LocalizedError {
     case missingRunningStatus
     case unsupportedStatus(UInt8)
     case unsupportedFormat(Int)
+    case deltaTooLarge
 
     public var errorDescription: String? {
         switch self {
@@ -16,6 +17,7 @@ public enum MIDIError: Error, Equatable, Sendable, LocalizedError {
         case .missingRunningStatus: "a MIDI event has no status byte and there is no running status"
         case .unsupportedStatus(let status): "unsupported MIDI status byte 0x\(String(status, radix: 16))"
         case .unsupportedFormat(let format): "MIDI format \(format) is not supported (only type 1)"
+        case .deltaTooLarge: "the time between two kept events is too long for a MIDI delta time"
         }
     }
 }
@@ -24,6 +26,8 @@ public enum MIDIError: Error, Equatable, Sendable, LocalizedError {
 /// the last byte; at most four bytes (Standard MIDI Files spec, section 1).
 enum VariableLengthQuantity {
     static let maxByteCount = 4
+    /// Four bytes of seven bits.
+    static let maxValue: UInt32 = 0x0FFF_FFFF
     static let continuationBit: UInt8 = 0x80
     static let payloadMask: UInt8 = 0x7F
     static let bitsPerByte: UInt32 = 7

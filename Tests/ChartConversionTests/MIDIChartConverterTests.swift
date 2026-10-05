@@ -170,6 +170,22 @@ struct MIDIChartConverterTests {
         #expect(totalTicks(ghl) == 10)
     }
 
+    @Test("dropped notes whose delta times add up past the VLQ limit fail instead of crashing")
+    func deltaOverflow() throws {
+        let maxDelta = Int(VariableLengthQuantity.maxValue)
+        let dropped = (0..<20).map { _ in M.note(40, delta: maxDelta, length: 0) }
+        let track = M.track(M.name(Self.guitarName), dropped.flatMap { $0 }, M.note(96), M.endOfTrack())
+        #expect(throws: MIDIError.deltaTooLarge) { try converter.convert(source(track)) }
+    }
+
+    @Test("a carried delta that still fits is written, up to the limit")
+    func deltaAtTheLimit() throws {
+        let maxDelta = Int(VariableLengthQuantity.maxValue)
+        let track = M.track(M.name(Self.guitarName), M.note(40, delta: maxDelta, length: 0), M.note(96), M.endOfTrack())
+        let file = try #require(try convert(source(track)))
+        #expect(try pressed(ghlTrack(file)).map(\.tick) == [maxDelta])
+    }
+
     // MARK: Verification
 
     private func converted(_ original: Data) throws -> Data {
