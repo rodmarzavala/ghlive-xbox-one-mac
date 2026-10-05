@@ -88,7 +88,7 @@ The exact menu names differ between game versions, so this guide does not spell 
 
 ### Playing classic 5-fret charts
 
-Most community charts are 5-fret, and 6-fret (GHL) charts are the smaller catalogue. To play a 5-fret chart with the 6-fret guitar:
+Many charts are 5-fret only. To play a 5-fret chart with the 6-fret guitar:
 
 1. In GHLive's Settings, choose the **5-fret (classic charts)** preset and confirm.
 2. In the game, bind the keyboard as a regular 5-fret guitar using the keys `1` to `5` for Green, Red, Yellow, Blue and Orange. The strum bar, Hero Power (Star Power), whammy and pause keys are the same as in the table above.
