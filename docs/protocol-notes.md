@@ -5,7 +5,7 @@ Working notes, written in our own words. Sources:
 - [MS-GIPUSB](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gipusb/e7c90904-5e21-426e-b9ad-d82adeee0dbc): Microsoft's open specification of GIP over USB. Primary reference for framing and handshake.
 - [PlasticBand](https://github.com/TheNathannator/PlasticBand): `Docs/Instruments/6-Fret Guitar/Xbox One.md` and `Docs/Descriptor Dumps/Xbox One/Guitar Hero Live Guitar Dongle.txt` (CC BY-SA 4.0: cited, not copied).
 - [RB4InstrumentMapper](https://github.com/TheNathannator/RB4InstrumentMapper) (MIT): `Parsing/Packets/GHLGuitar/*`.
-- Linux xpad (GPL-2.0+): only read to confirm the GIP interface triplet. No code taken from it.
+- Linux xpad (GPL-2.0+): consulted for facts only (GIP interface triplet, LED and auth-done payloads, start order, keep-alive bytes). No code taken from it.
 
 ## USB layout (confirmed on hardware, phase 1)
 
@@ -29,7 +29,21 @@ On macOS no kernel driver matches the device, so it stays **unconfigured** (no `
 | `0x21` | device → host | 27 | Full guitar report, PS3/Wii U GHL layout, sent at a fixed poll rate. |
 | `0x22` | host → device | 8 | PS3-style output. Sub-command `0x02` is a keep-alive that **must be sent every 8 s** for input to flow. Sub-command `0x01` sets the player LEDs. |
 
-Phase 2 will implement: set configuration → open interface 0 → read the announce → send GIP power-on (command `0x05`) per MS-GIPUSB → start the 8 s keep-alive.
+## Handshake (phase 2, implemented in `tools/handshake.py`, confirmed on hardware)
+
+1. Set configuration 1 and claim interface 0.
+2. Send POWER (`0x05`, payload `00`), LED (`0x0A`, payload `00 01 14`) and AUTHENTICATE (`0x06`, payload `01 00`), sequences 1-3, then the GHL keep-alive (`0x22`, sequence 0). The host does not wait for an announce.
+3. Resend the keep-alive every 8 s. Acknowledge any packet with the acknowledge-required flag, keeping its sequence and client id.
+
+Observed: the dongle answers with STATUS (flags `0x20`, payload `83`) and an ACKNOWLEDGE of the LED packet. The dongle LED turns on and the guitar syncs. No ANNOUNCE was seen.
+
+The guitar then streams `0x21` (27 bytes, about every 12 ms). Idle payload:
+`00 00 0f 80 80 80 80 00 00 00 00 00 00 00 00 00 00 00 00 70 00 80 01 00 02 00 02`.
+Byte 19 (tilt) jitters by about +-3 at rest. This matches PlasticBand's layout.
+
+STATUS (`0x03`, payload `83`) arrives about every 20 s. A single USB IN transfer may bundle several GIP messages back to back (seen: STATUS followed by a `0x21` report), so a transfer must be decoded message by message.
+
+Chunked GIP packets (flag `0x80`) are not supported: they are logged and not acknowledged.
 
 ## Guitar report `0x21` (to be verified in phase 3)
 

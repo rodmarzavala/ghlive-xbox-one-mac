@@ -29,7 +29,7 @@ Protocol details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 ## Roadmap
 
 - [x] **Phase 1: Discovery.** Descriptor dump and macOS IORegistry inspection.
-- [ ] **Phase 2: Handshake.** Configure the device, power it on over GIP, dongle LED on, guitar syncs.
+- [x] **Phase 2: Handshake.** Configure the device, power it on over GIP, dongle LED on, guitar syncs.
 - [ ] **Phase 3: Sniffer.** Raw packet dump to confirm the button mapping on real hardware.
 - [ ] **Phase 4: Parser and keyboard output.** Typed guitar state and configurable key mapping.
 - [ ] **Phase 5: Polish.** Stable CLI or menu bar app, automatic reconnection, full user guide.
