@@ -28,7 +28,7 @@ public struct SongIniPatcher: Sendable {
         let entries = section.map { ($0, Self.keyValue(of: lines[$0])) }
         if entries.contains(where: { $0.1?.key == Self.sixFretKey }) { return .alreadyPresent }
         let fiveFret = entries.first { $0.1?.key == Self.fiveFretKey }
-        let value = fiveFret?.1?.value ?? Self.defaultValue
+        let value = Self.sixFretValue(copying: fiveFret?.1?.value)
         let insertAfter = fiveFret?.0 ?? Self.lastContentLine(in: section, of: lines)
         let lineBreak = Self.text(data).contains("\r\n") ? "\r\n" : "\n"
         var patched = lines
@@ -66,7 +66,7 @@ public struct SongIniPatcher: Sendable {
             throw ConversionError.verificationFailed("song.ini changed more than the diff_guitarghl line")
         }
         let expected = Self.songSection(in: originalLines).flatMap { Self.fiveFretValue(in: $0, of: originalLines) }
-        guard value == (expected ?? Self.defaultValue) else {
+        guard value == Self.sixFretValue(copying: expected) else {
             throw ConversionError.verificationFailed(
                 "diff_guitarghl is \(value), diff_guitar is \(expected ?? "absent")")
         }
@@ -125,6 +125,12 @@ public struct SongIniPatcher: Sendable {
         guard parts.count == 2 else { return nil }
         let key = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
         return (key, parts[1].trimmingCharacters(in: .whitespaces))
+    }
+
+    /// A negative `diff_guitar` means "no such part" (a song made only for 6-fret), so it is not copied.
+    private static func sixFretValue(copying fiveFret: String?) -> String {
+        guard let fiveFret, let difficulty = Int(fiveFret), difficulty >= 0 else { return defaultValue }
+        return fiveFret
     }
 
     private static func fiveFretValue(in section: Range<Int>, of lines: [String]) -> String? {

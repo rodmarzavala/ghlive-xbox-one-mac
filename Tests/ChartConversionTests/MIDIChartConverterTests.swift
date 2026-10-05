@@ -115,8 +115,25 @@ struct MIDIChartConverterTests {
             return try pressed(ghlTrack(StandardMIDIFile(data: out))).map(\.note)
         }
         #expect(try notes(legacy, keep) == [103])
-        #expect(try notes(track, force) == [116, 116])
+        #expect(try notes(track, force) == [116])
         #expect(try notes(track, .none) == [116, 103])
+    }
+
+    @Test("when song.ini makes 103 the Star Power, real 116 notes are not Star Power and are dropped")
+    func overlappingStarPowerPhrases() throws {
+        let overlapping = M.track(
+            M.name(Self.guitarName), M.noteOn(103), M.noteOn(116, delta: 50), M.noteOff(103, delta: 50),
+            M.noteOff(116, delta: 50), M.note(96, delta: 10), M.endOfTrack())
+        let data = source(overlapping)
+        let force = ConversionContext(starPowerNote: 103)
+        guard case .converted(let out, _) = try converter.convert(data, context: force) else {
+            Issue.record("not converted")
+            return
+        }
+        let ghl = try ghlTrack(StandardMIDIFile(data: out))
+        #expect(pressed(ghl).map(\.note) == [116, 98])
+        #expect(pressed(ghl).map(\.tick) == [0, 160])
+        #expect(try converter.verify(converted: out, original: data, context: force) == 2)
     }
 
     @Test("verification uses the same Star Power rule as the conversion")
@@ -183,7 +200,7 @@ struct MIDIChartConverterTests {
 
     @Test("running twice adds nothing")
     func idempotent() throws {
-        let out = try #require(try converter.convert(source(guitarTrack(M.note(96)))))
+        let out = try converter.convert(source(guitarTrack(M.note(96))))
         guard case .converted(let data, let added) = out else { return }
         #expect(added == [Self.ghlName])
         #expect(try converter.convert(data) == .alreadyHasSixFret)
@@ -220,6 +237,14 @@ struct MIDIChartConverterTests {
         let maxDelta = Int(VariableLengthQuantity.maxValue)
         let dropped = (0..<20).map { _ in M.note(40, delta: maxDelta, length: 0) }
         let track = M.track(M.name(Self.guitarName), dropped.flatMap { $0 }, M.note(96), M.endOfTrack())
+        #expect(throws: MIDIError.deltaTooLarge) { try converter.convert(source(track)) }
+    }
+
+    @Test("one tick past the limit fails too")
+    func deltaJustOverTheLimit() {
+        let maxDelta = Int(VariableLengthQuantity.maxValue)
+        let track = M.track(
+            M.name(Self.guitarName), M.note(40, delta: maxDelta, length: 1), M.note(96), M.endOfTrack())
         #expect(throws: MIDIError.deltaTooLarge) { try converter.convert(source(track)) }
     }
 

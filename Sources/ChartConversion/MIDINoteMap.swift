@@ -67,7 +67,8 @@ enum MIDINoteMap {
         }
         map[MIDIGuitarMarker.solo] = soloIsStarPower ? MIDIGuitarMarker.starPower : MIDIGuitarMarker.solo
         map[MIDIGuitarMarker.tap] = MIDIGuitarMarker.tap
-        map[MIDIGuitarMarker.starPower] = MIDIGuitarMarker.starPower
+        // With 103 as Star Power, any 116 is not Star Power (the song.ini says so): dropped, not merged.
+        map[MIDIGuitarMarker.starPower] = soloIsStarPower ? nil : MIDIGuitarMarker.starPower
         return map
     }
 }

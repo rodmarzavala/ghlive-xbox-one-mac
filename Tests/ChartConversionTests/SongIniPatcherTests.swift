@@ -30,6 +30,15 @@ struct SongIniPatcherTests {
             try patched(ini) == "[Song]\nname = Synthetic\nartist = Nobody\ndiff_guitarghl = 0\n\n[other]\nx = 1\n")
     }
 
+    @Test("a negative diff_guitar (no 5-fret part) is not copied: the value is 0")
+    func negativeDifficulty() throws {
+        #expect(try patched("[song]\ndiff_guitar = -1\n") == "[song]\ndiff_guitar = -1\ndiff_guitarghl = 0\n")
+        #expect(try patched("[song]\ndiff_guitar = 0\n")?.contains("diff_guitarghl = 0\n") == true)
+        #expect(try patched("[song]\ndiff_guitar = abc\n")?.contains("diff_guitarghl = 0\n") == true)
+        let good = try #require(try patched("[song]\ndiff_guitar = -1\n"))
+        #expect(try patcher.verify(patched: Data(good.utf8), original: Data("[song]\ndiff_guitar = -1\n".utf8)) == "0")
+    }
+
     @Test("an existing diff_guitarghl is never overwritten, whatever its case")
     func existingKeyKept() throws {
         #expect(try patcher.patch(Data("[song]\ndiff_guitar = 4\ndiff_guitarghl = 1\n".utf8)) == .alreadyPresent)
