@@ -44,6 +44,13 @@ public struct ConversionReport: Equatable, Sendable {
     /// The folder the originals were copied to; nil when nothing was backed up.
     public let backupFolder: URL?
 
+    public init(root: URL, isDryRun: Bool, results: [SongResult], backupFolder: URL?) {
+        self.root = root
+        self.isDryRun = isDryRun
+        self.results = results
+        self.backupFolder = backupFolder
+    }
+
     public var convertedCount: Int {
         results.filter {
             if case .converted = $0.outcome { return true }

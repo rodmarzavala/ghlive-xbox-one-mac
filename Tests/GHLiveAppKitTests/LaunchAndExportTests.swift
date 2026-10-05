@@ -68,6 +68,10 @@ struct ScreenshotExporterTests {
         #expect(files.count == SampleStates.screens().count * 2)
         #expect(files.contains { $0.lastPathComponent == "monitor-active-dark.png" })
         #expect(files.contains { $0.lastPathComponent == "settings-light.png" })
+        for name in ["chart-conversion-confirm", "chart-conversion-result", "chart-conversion-result-problem"] {
+            #expect(files.contains { $0.lastPathComponent == "\(name)-light.png" })
+            #expect(files.contains { $0.lastPathComponent == "\(name)-dark.png" })
+        }
         #expect(files.contains { $0.lastPathComponent == "settings-preset-five-fret-light.png" })
         let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
         for file in files {
