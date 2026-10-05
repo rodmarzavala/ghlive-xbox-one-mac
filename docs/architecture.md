@@ -3,13 +3,11 @@
 The Swift package splits into targets with one responsibility each. Dependencies point downwards only.
 
 ```
-ghlive (CLI)        GHLiveApp (menu bar, separate)
-        \            /
-          GHLiveCore            GuitarDriver: the orchestrator
-   /     |       |        \
-GIPProtocol  GuitarInput  KeyMapping -> GuitarInput
-                 KeyboardOutput -> GuitarInput, KeyMapping
-USBTransport (no dependencies on the others)
+ghlive (main.swift) -> GHLiveCLI -> GHLiveCore         GHLiveApp (menu bar, separate) -> GHLiveCore
+GHLiveCore -> GIPProtocol, GuitarInput, KeyMapping, KeyboardOutput, USBTransport
+KeyMapping -> GuitarInput
+KeyboardOutput -> GuitarInput, KeyMapping
+GIPProtocol, GuitarInput, USBTransport: no dependencies on the other targets
 ```
 
 | Target | Responsibility |
@@ -19,6 +17,7 @@ USBTransport (no dependencies on the others)
 | `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
 | `KeyboardOutput` | `OutputSink` and `KeyEmitter` protocols, `KeyboardSink` (key diffs, shared keys, `releaseAll`), `CGEventKeyEmitter`, `DryRunKeyEmitter`, `AccessibilityPermission`. |
 | `USBTransport` | `PacketTransport`, `DongleConnecting`, `DongleEventSource` protocols; IOUSBHost `DongleConnection`; IOKit `DongleMonitor`. The only target that touches IOKit. |
+| `GHLiveCLI` | Argument parsing, the `run`, `sniff` and `keymap` commands and the verbose reporter, as a library so it is testable. `ghlive` is a one-line `main.swift` calling `runCLI`. |
 | `GHLiveCore` | `GuitarDriver`: monitor, connection, session, parser, detector, sink. Observable status and live input for UIs. |
 
 ## Data flow
@@ -37,12 +36,12 @@ GipSession.duePackets(now:) every tick --> keep-alive write
 
 - `GuitarDriver` is `@MainActor` and an `ObservableObject`. All of its state, the sink and the emitters live on the main actor, so SwiftUI can observe `status`, `snapshot` and `isPaused` directly (`ObservableObject` rather than `@Observable`, which needs macOS 14 while the package targets macOS 13).
 - IOKit callbacks (read completions, device notifications) run on private dispatch queues and only `yield` into `AsyncStream`s. The driver consumes those streams on the main actor, so no locks are needed in the logic.
-- Reads are asynchronous (`enqueueIORequest`), so teardown can abort them and nothing blocks forever. Interrupt pipes require `completionTimeout: 0`.
+- Reads and writes are asynchronous (`enqueueIORequest`). Interrupt pipes require `completionTimeout: 0`, so a request on a wedged pipe has no timeout of its own: the driver ends it by closing the transport when its task is cancelled (`stop()`, dongle removal), which aborts the pending I/O. The read stream keeps only the newest 64 transfers, so a stalled consumer never replays stale input.
 - Per connection the driver runs a reader task and a tick task (keep-alive and guitar-silence check). Cancelling the driver task tears both down, closes the dongle and releases all keys.
 
 ## Safety guarantees
 
-`OutputSink.releaseAll()` runs on stop, on disconnect or read failure, on pause, and when the guitar has been silent for more than one second. `KeyboardSink` marks a key as pressed before posting its key down and forgets it only after its key up, so a release arriving in between still lifts the key.
+`OutputSink.releaseAll()` runs, on the main actor, on stop, on disconnect or read failure, on pause, and when the guitar has been silent for more than one second. `KeyboardSink` marks a key as pressed before posting its key down and forgets it only after its key up, so a release arriving in between still lifts the key.
 
 ## Status
 

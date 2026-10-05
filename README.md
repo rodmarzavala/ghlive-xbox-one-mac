@@ -43,8 +43,6 @@ tools/   Python prototype used for reverse engineering (phases 1–3)
 docs/    Protocol notes and references
 ```
 
-The final application will be a Swift package built on Apple's `IOUSBHost` framework.
-
 ## Building from source (Swift)
 
 ```

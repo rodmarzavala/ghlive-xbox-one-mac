@@ -24,6 +24,17 @@ private func printError(_ text: String) {
     FileHandle.standardError.write(Data((text + "\n").utf8))
 }
 
+/// Parses the arguments and runs the command; returns the process exit code.
+@MainActor
+public func runCLI(arguments: [String]) async -> Int32 {
+    do {
+        return await execute(try parseArguments(arguments))
+    } catch {
+        printError("ghlive: \(error)\n\n\(usage)")
+        return ExitCode.usage
+    }
+}
+
 @MainActor
 func execute(_ command: Command) async -> Int32 {
     switch command {
@@ -75,7 +86,7 @@ private func run(_ options: RunOptions) async -> Int32 {
     } else {
         emitter = CGEventKeyEmitter()
     }
-    let log: (String) -> Void = { text in
+    let log: @Sendable (String) -> Void = { text in
         if options.verbose { printLine(text) }
     }
     let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log)

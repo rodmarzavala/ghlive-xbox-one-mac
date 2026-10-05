@@ -413,4 +413,18 @@ struct GuitarDriverTests {
         #expect(await eventually { harness.driver.activeControls == [.black1] })
         await harness.driver.stop()
     }
+
+    @Test("a monitor that stops by itself is reported as an error")
+    func monitorStops() async {
+        let harness = Harness(connector: FakeConnector([]))
+        harness.driver.start()
+        harness.monitor.finish()
+        #expect(
+            await eventually {
+                if case .error(let message) = harness.driver.status { return message.contains("monitor") }
+                return false
+            }
+        )
+        await harness.driver.stop()
+    }
 }

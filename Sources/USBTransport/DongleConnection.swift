@@ -13,6 +13,8 @@ private let maxPacketSize = 64
 private let usbConfigurationValue = 1
 // Interrupt pipes only accept 0 ("never time out"); any other value is kIOReturnBadArgument.
 private let interruptCompletionTimeout: TimeInterval = 0
+// About a second of reports at the guitar's ~80 Hz: if the consumer stalls, old input is dropped, not replayed.
+private let incomingBufferLimit = 64
 // The interface service shows up asynchronously after the device is configured.
 private let interfacePollAttempts = 30
 private let interfacePollInterval: Duration = .milliseconds(100)
@@ -68,7 +70,7 @@ public final class DongleConnection: PacketTransport, @unchecked Sendable {
     // MARK: PacketTransport
 
     public func incomingPackets() -> AsyncThrowingStream<Data, Error> {
-        AsyncThrowingStream { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(incomingBufferLimit)) { continuation in
             continuation.onTermination = { [weak self] _ in self?.close() }
             submitRead(continuation)
         }
@@ -137,10 +139,7 @@ public final class DongleConnection: PacketTransport, @unchecked Sendable {
     // MARK: Discovery
 
     private static func findDeviceService() -> io_service_t? {
-        let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
-        matching["idVendor"] = DongleIdentity.vendorID
-        matching["idProduct"] = DongleIdentity.productID
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, matching)
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, DongleIdentity.matchingDictionary())
         return service == IO_OBJECT_NULL ? nil : service
     }
 
@@ -224,7 +223,8 @@ extension DongleError {
         switch status {
         case kIOReturnExclusiveAccess:
             .exclusiveAccess
-        case kIOReturnNoDevice, kIOReturnNotAttached, kIOReturnNotResponding:
+        // Aborted only reaches here when we did not close ourselves, so the device went away under us.
+        case kIOReturnNoDevice, kIOReturnNotAttached, kIOReturnNotResponding, kIOReturnAborted:
             .disconnected
         default:
             .ioFailure(operation: operation, code: status)

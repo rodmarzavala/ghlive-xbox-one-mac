@@ -106,6 +106,7 @@ final class FakeMonitor: DongleEventSource, @unchecked Sendable {
     }
 
     func send(_ event: DongleEvent) { continuation.yield(event) }
+    func finish() { continuation.finish() }
     func events() -> AsyncStream<DongleEvent> { stream }
 }
 

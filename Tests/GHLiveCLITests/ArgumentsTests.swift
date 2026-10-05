@@ -2,7 +2,7 @@ import GHLiveCore
 import GuitarInput
 import Testing
 
-@testable import ghlive
+@testable import GHLiveCLI
 
 @Suite("Command line parsing")
 struct ArgumentsTests {

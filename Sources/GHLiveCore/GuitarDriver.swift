@@ -50,6 +50,8 @@ public final class GuitarDriver: ObservableObject {
         public init() {}
     }
 
+    static let monitorStoppedMessage = "The USB monitor stopped, so the dongle can no longer be detected."
+
     @Published public private(set) var status: DriverStatus = .waitingForDongle
     @Published public private(set) var snapshot: GuitarSnapshot?
     @Published public private(set) var isPaused = false
@@ -61,7 +63,7 @@ public final class GuitarDriver: ObservableObject {
     private let connector: any DongleConnecting
     private let timing: Timing
     private let now: @Sendable () -> TimeInterval
-    private let log: (String) -> Void
+    private let log: @Sendable (String) -> Void
     private let packetObserver: (PacketDirection, GipPacket) -> Void
 
     private var sink: any OutputSink
@@ -78,7 +80,7 @@ public final class GuitarDriver: ObservableObject {
         thresholds: Thresholds = Thresholds(),
         timing: Timing = Timing(),
         now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        log: @escaping (String) -> Void = { _ in },
+        log: @escaping @Sendable (String) -> Void = { _ in },
         packetObserver: @escaping (PacketDirection, GipPacket) -> Void = { _, _ in }
     ) {
         self.monitor = monitor
@@ -95,11 +97,11 @@ public final class GuitarDriver: ObservableObject {
     public static func live(
         keymap: Keymap,
         emitter: any KeyEmitter,
-        log: @escaping (String) -> Void = { _ in },
+        log: @escaping @Sendable (String) -> Void = { _ in },
         packetObserver: @escaping (PacketDirection, GipPacket) -> Void = { _, _ in }
     ) -> GuitarDriver {
         GuitarDriver(
-            monitor: DongleMonitor(),
+            monitor: DongleMonitor(log: log),
             connector: DongleConnector(),
             sink: KeyboardSink(keymap: keymap, emitter: emitter),
             thresholds: keymap.thresholds,
@@ -165,6 +167,7 @@ public final class GuitarDriver: ObservableObject {
         connection?.cancel()
         await connection?.value
         resetInput()
+        if !Task.isCancelled { setStatus(.error(Self.monitorStoppedMessage)) }
     }
 
     // MARK: Connection

@@ -18,10 +18,11 @@ let package = Package(
             name: "GHLiveCore",
             dependencies: ["GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
-        .executableTarget(
-            name: "ghlive",
+        .target(
+            name: "GHLiveCLI",
             dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
+        .executableTarget(name: "ghlive", dependencies: ["GHLiveCLI"]),
         .testTarget(name: "GIPProtocolTests", dependencies: ["GIPProtocol"]),
         .testTarget(name: "GuitarInputTests", dependencies: ["GuitarInput"]),
         .testTarget(name: "KeyMappingTests", dependencies: ["KeyMapping", "GuitarInput"]),
@@ -30,6 +31,7 @@ let package = Package(
             name: "GHLiveCoreTests",
             dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
-        .testTarget(name: "ghliveTests", dependencies: ["ghlive"]),
+        .testTarget(name: "USBTransportTests", dependencies: ["USBTransport"]),
+        .testTarget(name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput"]),
     ]
 )

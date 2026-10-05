@@ -4,11 +4,16 @@ import IOKit
 /// Watches the registry for the dongle with `IOServiceAddMatchingNotification`: first-match for arrival,
 /// terminated for removal. This is what makes automatic reconnection possible.
 public struct DongleMonitor: DongleEventSource {
-    public init() {}
+    private let log: @Sendable (String) -> Void
+
+    /// `log` receives the reason when the notifications cannot be set up; the event stream then ends.
+    public init(log: @escaping @Sendable (String) -> Void = { _ in }) {
+        self.log = log
+    }
 
     public func events() -> AsyncStream<DongleEvent> {
         AsyncStream { continuation in
-            let registration = Registration(continuation: continuation)
+            let registration = Registration(continuation: continuation, log: log)
             registration.start()
             continuation.onTermination = { _ in registration.stop() }
         }
@@ -23,8 +28,11 @@ private final class Registration: @unchecked Sendable {
     private var removedIterator = io_iterator_t()
     private var retainedSelf: Unmanaged<Registration>?
 
-    init(continuation: AsyncStream<DongleEvent>.Continuation) {
+    private let log: @Sendable (String) -> Void
+
+    init(continuation: AsyncStream<DongleEvent>.Continuation, log: @escaping @Sendable (String) -> Void) {
         self.continuation = continuation
+        self.log = log
     }
 
     func start() {
@@ -35,9 +43,15 @@ private final class Registration: @unchecked Sendable {
             let context = Unmanaged.passRetained(self)
             retainedSelf = context
             // Removal first, so the arrival drain below cannot race a terminate that is already queued.
-            register(kIOTerminatedNotification, callback: removedCallback, context: context, iterator: &removedIterator)
+            guard
+                register(
+                    kIOTerminatedNotification, callback: removedCallback, context: context, iterator: &removedIterator)
+            else { return }
             drain(removedIterator, event: nil)
-            register(kIOFirstMatchNotification, callback: arrivedCallback, context: context, iterator: &arrivedIterator)
+            guard
+                register(
+                    kIOFirstMatchNotification, callback: arrivedCallback, context: context, iterator: &arrivedIterator)
+            else { return }
             drain(arrivedIterator, event: .arrived)
         }
     }
@@ -69,11 +83,14 @@ private final class Registration: @unchecked Sendable {
         callback: IOServiceMatchingCallback,
         context: Unmanaged<Registration>,
         iterator: inout io_iterator_t
-    ) {
-        let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
-        matching["idVendor"] = DongleIdentity.vendorID
-        matching["idProduct"] = DongleIdentity.productID
-        IOServiceAddMatchingNotification(port, type, matching, callback, context.toOpaque(), &iterator)
+    ) -> Bool {
+        let status = IOServiceAddMatchingNotification(
+            port, type, DongleIdentity.matchingDictionary(), callback, context.toOpaque(), &iterator
+        )
+        guard status != KERN_SUCCESS else { return true }
+        log("cannot watch for the dongle (\(type), kern_return 0x\(String(UInt32(bitPattern: status), radix: 16)))")
+        continuation.finish()
+        return false
     }
 }
 

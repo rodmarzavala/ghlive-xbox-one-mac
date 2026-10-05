@@ -1,9 +1,18 @@
 import Foundation
+import IOKit
 
 /// USB identity of the Guitar Hero Live Xbox One dongle (Activision).
 public enum DongleIdentity {
     public static let vendorID = 0x1430
     public static let productID = 0x079B
+
+    /// A fresh matching dictionary (IOKit consumes it per call) for this dongle's USB device.
+    public static func matchingDictionary() -> NSMutableDictionary {
+        let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
+        matching["idVendor"] = vendorID
+        matching["idProduct"] = productID
+        return matching
+    }
 }
 
 /// A byte pipe to the dongle: one GIP message bundle per USB transfer in, raw bytes out.
