@@ -77,3 +77,13 @@ class PacketLogger:
 
     def _print(self, line: str) -> None:
         print(line, file=self._out, flush=True)
+
+
+class NullPacketLogger(PacketLogger):
+    """Logs nothing, for callers that own the console themselves."""
+
+    def __init__(self) -> None:
+        super().__init__(show_repeats=False)
+
+    def _print(self, line: str) -> None:
+        return None

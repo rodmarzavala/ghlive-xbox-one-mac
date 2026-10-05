@@ -1,0 +1,28 @@
+# Control name -> key name. Several controls may share a key.
+# Keys: a-z, 0-9, up, down, left, right, space, return, escape, tab, f1-f12.
+[keys]
+black_1 = "1"
+black_2 = "2"
+black_3 = "3"
+white_1 = "q"
+white_2 = "w"
+white_3 = "e"
+strum_up = "up"
+strum_down = "down"
+hero_power = "space"
+tilt = "space"
+whammy = "x"
+pause = "escape"
+ghtv = "tab"
+dpad_up = "up"
+dpad_down = "down"
+dpad_left = "left"
+dpad_right = "right"
+
+# Optional. Whammy is 0.0 (released) to 1.0 (fully pressed); tilt is the raw byte (95-115 at rest).
+# Each engages at its threshold and releases once it drops below `threshold - hysteresis`.
+[thresholds]
+whammy = 0.5
+whammy_hysteresis = 0.1
+tilt = 150
+tilt_hysteresis = 10
