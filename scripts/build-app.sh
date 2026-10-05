@@ -27,6 +27,20 @@ verify_universal() {
     done
 }
 
+verify_zip() {
+    local archive="$1" scratch
+    scratch="$(mktemp -d)"
+    /usr/bin/unzip -q "$archive" -d "$scratch"
+    if find "$scratch" -name '._*' | grep -q .; then
+        echo "error: ${archive} contains AppleDouble entries" >&2
+        rm -rf "$scratch"
+        exit 1
+    fi
+    codesign --verify --deep --strict "$scratch/GHLive.app"
+    echo "$(basename "$archive"): extracts with plain unzip and the signature verifies"
+    rm -rf "$scratch"
+}
+
 echo "==> Building GHLive ${VERSION} (universal)"
 swift build -c release --arch arm64 --arch x86_64
 BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
@@ -71,7 +85,10 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 verify_universal "$APP/Contents/MacOS/GHLiveApp"
 
 echo "==> Packing"
-ditto -c -k --keepParent "$APP" "$DIST/$APP_ZIP"
+# --norsrc --noextattr --noqtn keep AppleDouble "._*" entries out of the zip: a plain unzip would extract
+# them next to the app and break its code seal.
+ditto -c -k --norsrc --noextattr --noqtn --keepParent "$APP" "$DIST/$APP_ZIP"
+verify_zip "$DIST/$APP_ZIP"
 
 CLI_STAGE="$DIST/cli"
 mkdir -p "$CLI_STAGE"
