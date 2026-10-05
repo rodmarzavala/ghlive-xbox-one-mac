@@ -26,6 +26,7 @@ macOS ships no driver for this dongle: it stays unconfigured and its LED never t
 - Automatic reconnection: plug or unplug the dongle at any time.
 - Settings window: click a control, press a key, done. Changes save automatically, and there is a "Restore defaults" button.
 - Input Monitor: live frets, strum, buttons, d-pad, whammy and tilt meters with their thresholds, plus the keys currently being sent.
+- "Test my guitar": a checklist in the Input Monitor that confirms every control is read correctly.
 - Adjustable tilt and whammy thresholds.
 - Pause and Resume from the menu.
 - A command-line tool, `ghlive`, for diagnostics and headless use.
@@ -105,6 +106,19 @@ Black 1 also sends Green so the first column is comfortable from either row. Thi
 
 ![Settings with the 5-fret preset applied](docs/images/settings-preset-five-fret-light.png)
 
+## Check that your guitar works
+
+Before you open Clone Hero, confirm in about a minute that every control is read correctly.
+
+1. Open **Input Monitor...** from the menu and click **Test my guitar**.
+2. Press every fret, both strum directions, Hero Power, Pause, GHTV and each d-pad direction once. Each one gets a green check the first time it is seen.
+3. Push the whammy bar all the way down and let it go back, then raise the guitar neck past the tilt threshold and lower it again. Both rows show the range they have seen.
+4. When all 17 controls are checked, the monitor says "All controls work. You're ready to play."
+
+**Start over** clears the checks. Losing the guitar's connection does not. If a control never gets its check, see [Troubleshooting](#troubleshooting).
+
+![The Input Monitor in test mode, part-way through](docs/images/monitor-guitar-test-light.png)
+
 ## Calibrating tilt and whammy
 
 Keyboard keys are on or off, so the whammy bar and tilt become switches that trigger once they pass a threshold.
@@ -174,6 +188,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **The dongle LED does not turn on.** Check the status line in the menu. If it says the dongle is in use by another app, see below. Otherwise unplug and replug it.
 - **The guitar does not sync.** Switch the guitar on once the status reads "Dongle ready".
 - **"The dongle is in use by another app".** Quit Steam, or any other app that reads Xbox controllers. GHLive retries every few seconds.
+- **A control never gets its check in "Test my guitar".** The Input Monitor does not see it: see [Check that your guitar works](#check-that-your-guitar-works) and [docs/troubleshooting.md](docs/troubleshooting.md#a-control-fails-the-guitar-test).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.
