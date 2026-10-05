@@ -89,11 +89,14 @@ private func run(_ options: RunOptions) async -> Int32 {
     }
     let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log)
     let subscription = options.verbose ? reportInput(of: driver) : nil
+    let errorReports = driver.$status.removeDuplicates().compactMap(StatusReporter.line(for:)).sink(
+        receiveValue: printError)
     driver.start()
     printLine("waiting for the dongle (Ctrl-C to quit)")
     await waitForTerminationSignal()
     await driver.stop()
     subscription?.cancel()
+    errorReports.cancel()
     return ExitCode.success
 }
 
