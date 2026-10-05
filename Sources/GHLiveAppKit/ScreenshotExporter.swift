@@ -13,13 +13,13 @@ public enum ScreenshotExporter {
         case renderFailed(String)
     }
 
-    private struct Appearance {
+    struct Appearance {
         let name: String
         let scheme: ColorScheme
         let background: Color
     }
 
-    private static let appearances = [
+    static let appearances = [
         Appearance(name: "light", scheme: .light, background: Color(white: 0.94)),
         Appearance(name: "dark", scheme: .dark, background: Color(white: 0.17)),
     ]
@@ -41,13 +41,16 @@ public enum ScreenshotExporter {
         return written
     }
 
-    private static func writePNG(of view: AnyView, appearance: Appearance, to url: URL) throws {
-        let content =
-            view
+    /// `ImageRenderer` draws Liquid Glass as blank, so screenshots always take the classic look.
+    static func styled<Content: View>(_ view: Content, appearance: Appearance) -> some View {
+        view
             .background(appearance.background)
             .environment(\.colorScheme, appearance.scheme)
             .environment(\.surfaceStyle, .classic)
-        let renderer = ImageRenderer(content: content)
+    }
+
+    private static func writePNG(of view: AnyView, appearance: Appearance, to url: URL) throws {
+        let renderer = ImageRenderer(content: styled(view, appearance: appearance))
         renderer.scale = renderScale
         guard let image = renderer.nsImage,
             let tiff = image.tiffRepresentation,
