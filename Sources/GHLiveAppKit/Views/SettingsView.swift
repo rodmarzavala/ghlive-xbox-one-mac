@@ -8,30 +8,41 @@ public struct SettingsView: View {
 
     @ObservedObject private var model: SettingsModel
     private let capturesKeys: Bool
+    private let limitsHeight: Bool
 
     private static let leftColumnGroupCount = 3
     private static let sliderStep = 1.0
     private static let whammyStep = 0.05
+    /// The footer row and the spacing above it: the one part that must never scroll away.
+    private static let footerHeight: CGFloat = 90
     private static let customPresetCaption = "You changed some keys. Pick a preset to start from its keys again."
 
-    /// `capturesKeys` is off for screenshots: the AppKit key monitor cannot be rendered.
-    public init(model: SettingsModel, capturesKeys: Bool = true) {
+    /// `capturesKeys` and `limitsHeight` are off for screenshots: the AppKit key monitor and scroll view cannot
+    /// be rendered.
+    public init(model: SettingsModel, capturesKeys: Bool = true, limitsHeight: Bool = true) {
         self.model = model
         self.capturesKeys = capturesKeys
+        self.limitsHeight = limitsHeight
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
-            GlassGroup {
+            ScrollsWithinScreen(isEnabled: limitsHeight, reservedHeight: Self.footerHeight) {
                 VStack(alignment: .leading, spacing: 14) {
-                    if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
-                    presetCard
-                    HStack(alignment: .top, spacing: 20) {
-                        column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+                    header
+                    GlassGroup {
                         VStack(alignment: .leading, spacing: 14) {
-                            ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) { groupCard($0) }
-                            thresholdsCard
+                            if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
+                            presetCard
+                            HStack(alignment: .top, spacing: 20) {
+                                column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+                                VStack(alignment: .leading, spacing: 14) {
+                                    ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) {
+                                        groupCard($0)
+                                    }
+                                    thresholdsCard
+                                }
+                            }
                         }
                     }
                 }

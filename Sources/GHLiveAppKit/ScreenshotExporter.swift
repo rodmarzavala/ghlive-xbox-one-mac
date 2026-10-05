@@ -135,7 +135,7 @@ enum SampleStates {
             status: StatusPresentation(status: status, isPaused: false),
             snapshot: snapshot, thresholds: Keymap.default.thresholds, bindings: Keymap.default.bindings,
             isPaused: false)
-        return SampleScreen(name: name, view: AnyView(MonitorView(monitor: presentation)))
+        return SampleScreen(name: name, view: AnyView(MonitorView(monitor: presentation, limitsHeight: false)))
     }
 
     private static func snapshot(
@@ -168,16 +168,17 @@ enum SampleStates {
         fiveFret.requestPreset(.fiveFret)
         fiveFret.confirmPreset()
         return [
-            SampleScreen(name: "settings", view: AnyView(SettingsView(model: saved, capturesKeys: false))),
-            SampleScreen(
-                name: "settings-preset-five-fret", view: AnyView(SettingsView(model: fiveFret, capturesKeys: false))),
-            SampleScreen(
-                name: "settings-recording-rejected-key",
-                view: AnyView(SettingsView(model: recording, capturesKeys: false))),
-            SampleScreen(
-                name: "settings-recording", view: AnyView(SettingsView(model: waiting, capturesKeys: false))),
-            SampleScreen(name: "settings-error", view: AnyView(SettingsView(model: broken, capturesKeys: false))),
+            settings("settings", saved),
+            settings("settings-preset-five-fret", fiveFret),
+            settings("settings-recording-rejected-key", recording),
+            settings("settings-recording", waiting),
+            settings("settings-error", broken),
         ]
+    }
+
+    private static func settings(_ name: String, _ model: SettingsModel) -> SampleScreen {
+        SampleScreen(
+            name: name, view: AnyView(SettingsView(model: model, capturesKeys: false, limitsHeight: false)))
     }
 
     /// kVK_ANSI_Equal, a key GHLive does not offer.
