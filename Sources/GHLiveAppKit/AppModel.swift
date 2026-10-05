@@ -93,7 +93,7 @@ public final class AppModel: ObservableObject {
         let problem = Self.problemText(settings.message)
         let launchState = launchAtLogin.state
         self.settings = settings
-        guitarTest = GuitarTestModel(thresholds: keymap.thresholds)
+        guitarTest = GuitarTestModel()
         statusPresentation = status
         isTrusted = accessibility.isTrusted
         self.launchState = launchState
@@ -276,7 +276,6 @@ public final class AppModel: ObservableObject {
 
     private func apply(_ newKeymap: Keymap) {
         keymap = newKeymap
-        guitarTest.updateThresholds(newKeymap.thresholds)
         driver.reconfigure(sink: KeyboardSink(keymap: newKeymap, emitter: emitter), thresholds: newKeymap.thresholds)
     }
 }

@@ -13,7 +13,6 @@ public struct GuitarTestSession: Equatable, Sendable {
     /// Every control that is simply pressed or not, in the enum's order.
     public static let digitalControls: [Control] = Control.allCases.filter { !analogControls.contains($0) }
 
-    public var thresholds: Thresholds
     public private(set) var whammyRange: ClosedRange<Double>?
     public private(set) var tiltRange: ClosedRange<Int>?
 
@@ -21,9 +20,7 @@ public struct GuitarTestSession: Equatable, Sendable {
     private var whammyProgress = AnalogProgress()
     private var tiltProgress = AnalogProgress()
 
-    public init(thresholds: Thresholds = Thresholds()) {
-        self.thresholds = thresholds
-    }
+    public init() {}
 
     public var totalCount: Int { Self.digitalControls.count + Self.analogControls.count }
 
@@ -41,29 +38,30 @@ public struct GuitarTestSession: Equatable, Sendable {
 
     public mutating func record(state: GuitarState, controls: Set<Control>) {
         verifiedDigital.formUnion(controls.subtracting(Self.analogControls))
-        recordWhammy(state.whammy)
-        recordTilt(Int(state.tilt))
+        recordWhammy(state.whammy, isEngaged: controls.contains(.whammy))
+        recordTilt(Int(state.tilt), isEngaged: controls.contains(.tilt))
     }
 
-    /// Starts over; the thresholds stay.
     public mutating func reset() {
-        self = GuitarTestSession(thresholds: thresholds)
+        self = GuitarTestSession()
     }
 
-    private mutating func recordWhammy(_ value: Double) {
+    /// "Engaged" is the `ControlDetector`'s answer, so the test follows the configured thresholds and
+    /// hysteresis without repeating them.
+    private mutating func recordWhammy(_ value: Double, isEngaged: Bool) {
         whammyRange = whammyRange.map { min($0.lowerBound, value)...max($0.upperBound, value) } ?? value...value
         whammyProgress.observe(
-            isEngaged: value >= thresholds.whammy,
+            isEngaged: isEngaged,
             isFullPress: value >= Self.whammyFullLevel,
             isReleased: value <= Self.whammyReleasedLevel)
     }
 
-    private mutating func recordTilt(_ value: Int) {
+    private mutating func recordTilt(_ value: Int, isEngaged: Bool) {
         tiltRange = tiltRange.map { min($0.lowerBound, value)...max($0.upperBound, value) } ?? value...value
         tiltProgress.observe(
-            isEngaged: value >= thresholds.tilt,
+            isEngaged: isEngaged,
             isFullPress: true,
-            isReleased: value < thresholds.tilt - thresholds.tiltHysteresis)
+            isReleased: !isEngaged)
     }
 }
 

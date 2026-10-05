@@ -16,7 +16,7 @@ struct GuitarTestModelTests {
     }
 
     @Test func snapshotsAreIgnoredUntilTheTestIsActive() {
-        let model = GuitarTestModel(thresholds: Thresholds())
+        let model = GuitarTestModel()
         model.receive(snapshot([.black1]))
         #expect(model.session.verifiedCount == 0)
         model.isActive = true
@@ -25,7 +25,7 @@ struct GuitarTestModelTests {
     }
 
     @Test func progressSurvivesALostGuitarAndSwitchingTheTestOff() {
-        let model = GuitarTestModel(thresholds: Thresholds())
+        let model = GuitarTestModel()
         model.isActive = true
         model.receive(snapshot([.black1]))
         model.receive(nil)
@@ -35,7 +35,7 @@ struct GuitarTestModelTests {
     }
 
     @Test func startOverClearsTheProgress() {
-        let model = GuitarTestModel(thresholds: Thresholds())
+        let model = GuitarTestModel()
         model.isActive = true
         model.receive(snapshot([.black1]))
         model.startOver()
@@ -44,19 +44,13 @@ struct GuitarTestModelTests {
     }
 
     @Test func followingAPublisherFeedsTheTest() {
-        let model = GuitarTestModel(thresholds: Thresholds())
+        let model = GuitarTestModel()
         let subject = PassthroughSubject<GuitarSnapshot?, Never>()
         model.follow(subject)
         model.isActive = true
         subject.send(nil)
         subject.send(snapshot([.strumDown]))
         #expect(model.session.isVerified(.strumDown))
-    }
-
-    @Test func newThresholdsApplyToTheRestOfTheTest() {
-        let model = GuitarTestModel(thresholds: Thresholds())
-        model.updateThresholds(Thresholds(tilt: 200, tiltHysteresis: 30))
-        #expect(model.session.thresholds.tilt == 200)
     }
 }
 

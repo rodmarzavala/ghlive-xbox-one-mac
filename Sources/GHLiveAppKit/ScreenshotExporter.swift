@@ -143,7 +143,7 @@ enum SampleStates {
 
     /// A test model that has seen `presses` one after another, then `analog` states.
     private static func guitarTest(pressing presses: [Control], analog: [GuitarState]) -> GuitarTestModel {
-        let model = GuitarTestModel(thresholds: Keymap.default.thresholds)
+        let model = GuitarTestModel()
         model.isActive = true
         let idle = GuitarState(pressedButtons: [], dpad: [], whammy: 0, tilt: restingTilt)
         for control in presses { model.receive(GuitarSnapshot(state: idle, controls: [control])) }
@@ -191,7 +191,7 @@ enum SampleStates {
             name: name,
             view: AnyView(
                 MonitorView(
-                    monitor: presentation, guitarTest: test ?? GuitarTestModel(thresholds: Keymap.default.thresholds),
+                    monitor: presentation, guitarTest: test ?? GuitarTestModel(),
                     limitsHeight: false)))
     }
 

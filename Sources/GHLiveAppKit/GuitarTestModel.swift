@@ -11,8 +11,8 @@ public final class GuitarTestModel: ObservableObject {
 
     private var subscription: AnyCancellable?
 
-    public init(thresholds: Thresholds) {
-        session = GuitarTestSession(thresholds: thresholds)
+    public init() {
+        session = GuitarTestSession()
     }
 
     /// Feeds every published snapshot to the test, such as the driver's.
@@ -32,10 +32,6 @@ public final class GuitarTestModel: ObservableObject {
 
     public func startOver() {
         session.reset()
-    }
-
-    public func updateThresholds(_ thresholds: Thresholds) {
-        session.thresholds = thresholds
     }
 }
 
