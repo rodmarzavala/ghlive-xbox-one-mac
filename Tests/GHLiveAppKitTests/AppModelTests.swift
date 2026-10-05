@@ -115,6 +115,17 @@ struct AppModelTests {
         await fixture.model.shutdown()
     }
 
+    // MARK: Guitar test
+
+    @Test func aGuitarReportReachesTheGuitarTest() async throws {
+        let fixture = AppFixture(dongle: ScriptedDongle())
+        fixture.model.guitarTest.isActive = true
+        fixture.model.start()
+        try await waitUntil { fixture.model.guitarTest.session.isVerified(.black1) }
+        #expect(fixture.model.guitarTest.session.isVerified(.black1))
+        await fixture.model.shutdown()
+    }
+
     // MARK: Settings
 
     @Test func savedSettingsReconfigureTheDriver() {

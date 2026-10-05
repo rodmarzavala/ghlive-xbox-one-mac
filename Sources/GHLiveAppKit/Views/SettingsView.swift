@@ -49,7 +49,7 @@ public struct SettingsView: View {
             }
             footer
         }
-        .padding(20)
+        .padding(ScreenFit.contentPadding)
         .frame(width: Self.width)
         .background {
             if capturesKeys {

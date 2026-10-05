@@ -49,7 +49,7 @@ public struct MonitorView: View {
             }
             keysBeingSent
         }
-        .padding(20)
+        .padding(ScreenFit.contentPadding)
         .frame(width: Self.width)
     }
 

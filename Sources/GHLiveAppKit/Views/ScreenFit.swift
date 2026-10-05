@@ -4,8 +4,11 @@ import SwiftUI
 /// Windows that size themselves to their content would run off a small display, hiding the controls at the
 /// bottom. The scrolling part is capped to the screen; what follows it stays in view.
 enum ScreenFit {
-    /// Title bar, window padding, the menu bar and the Dock.
-    static let windowChrome: CGFloat = 120
+    /// What the window adds around the scroll view and the reserved part: the title bar and the 20 pt padding
+    /// above and below. `visibleFrame` already excludes the menu bar and the Dock.
+    static let titleBarHeight: CGFloat = 28
+    static let contentPadding: CGFloat = 20
+    static let windowChrome: CGFloat = titleBarHeight + 2 * contentPadding
     static let minimumScrollHeight: CGFloat = 240
     /// Used when no screen is known, such as in a headless render.
     static let fallbackScreenHeight: CGFloat = 800
