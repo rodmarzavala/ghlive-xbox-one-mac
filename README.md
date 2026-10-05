@@ -1,4 +1,4 @@
-# ghl-xbox-macos
+# GHLive Mac
 
 Use the **Guitar Hero Live guitar with its Xbox One USB dongle on macOS**, for games such as [Clone Hero](https://clonehero.net/).
 
