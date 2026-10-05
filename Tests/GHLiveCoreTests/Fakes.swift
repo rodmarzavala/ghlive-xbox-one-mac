@@ -48,6 +48,7 @@ final class FakeTransport: PacketTransport, @unchecked Sendable {
     private var stallsWrites = false
     private var stalledWrites: [CheckedContinuation<Void, Error>] = []
     private var failingFromWrite: Int?
+    private var writeError: Error = DongleError.disconnected
     private let stream: AsyncThrowingStream<Data, Error>
     private let continuation: AsyncThrowingStream<Data, Error>.Continuation
 
@@ -62,7 +63,12 @@ final class FakeTransport: PacketTransport, @unchecked Sendable {
     /// Every write hangs until `close()`, like a write to a wedged USB pipe.
     func stallWrites() { lock.withLock { stallsWrites = true } }
     /// The write with this zero-based index, and every later one, throws.
-    func failWrites(from index: Int) { lock.withLock { failingFromWrite = index } }
+    func failWrites(from index: Int, with error: Error = DongleError.disconnected) {
+        lock.withLock {
+            failingFromWrite = index
+            writeError = error
+        }
+    }
 
     func feed(_ data: Data) { continuation.yield(data) }
     func fail(_ error: Error) { continuation.finish(throwing: error) }
@@ -71,8 +77,8 @@ final class FakeTransport: PacketTransport, @unchecked Sendable {
     func incomingPackets() -> AsyncThrowingStream<Data, Error> { stream }
 
     func write(_ data: Data) async throws {
-        let shouldFail = lock.withLock { failingFromWrite.map { writtenData.count >= $0 } ?? false }
-        if shouldFail { throw DongleError.disconnected }
+        let failure = lock.withLock { failingFromWrite.map { writtenData.count >= $0 } == true ? writeError : nil }
+        if let failure { throw failure }
         if lock.withLock({ stallsWrites }) {
             try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, Error>) in
                 let alreadyClosed = lock.withLock {

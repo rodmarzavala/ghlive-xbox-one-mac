@@ -1,6 +1,8 @@
+import Combine
 import Foundation
 import GIPProtocol
 import GuitarInput
+import IOKit
 import KeyMapping
 import KeyboardOutput
 import Testing
@@ -383,14 +385,13 @@ struct GuitarDriverTests {
         first.feed(guitarMessage(report([fretOffset: fretBlack1])))
         #expect(await eventually { harness.emitter.events == [.down(key("1"))] })
 
-        first.failWrites(from: 0)
+        let writeFailure = DongleError.ioFailure(operation: "write", code: kIOReturnBadArgument)
+        var statuses: [DriverStatus] = []
+        let subscription = harness.driver.$status.sink { statuses.append($0) }
+        defer { subscription.cancel() }
+        first.failWrites(from: 0, with: writeFailure)
         harness.clock.advance(by: GipSession.keepAliveInterval + 0.1)
-        #expect(
-            await eventually {
-                if case .error = harness.driver.status { return true }
-                return false
-            }
-        )
+        #expect(await eventually { statuses.contains(.error(writeFailure.localizedDescription)) })
         #expect(await eventually { harness.emitter.events == [.down(key("1")), .up(key("1"))] })
         #expect(await eventually { second.written.count == 4 })
         #expect(first.closed)
@@ -426,5 +427,25 @@ struct GuitarDriverTests {
             }
         )
         await harness.driver.stop()
+    }
+
+    @Test("stop and removal never publish an error status", arguments: [true, false])
+    func noErrorOnDeliberateTeardown(removal: Bool) async {
+        let transport = FakeTransport()
+        transport.stallWrites()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        var statuses: [DriverStatus] = []
+        let subscription = harness.driver.$status.sink { statuses.append($0) }
+        defer { subscription.cancel() }
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        #expect(await eventually { transport.stalledWriteCount == 1 })
+
+        if removal {
+            harness.monitor.send(.removed)
+            #expect(await eventually { harness.driver.status == .waitingForDongle })
+        }
+        await harness.driver.stop()
+        #expect(!statuses.contains { if case .error = $0 { true } else { false } })
     }
 }

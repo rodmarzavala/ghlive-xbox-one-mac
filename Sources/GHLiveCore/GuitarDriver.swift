@@ -188,6 +188,8 @@ public final class GuitarDriver: ObservableObject {
             } catch is CancellationError {
                 break
             } catch {
+                // Closing the transport on cancellation makes the pending write throw; that is not a fault.
+                if Task.isCancelled { break }
                 setStatus(.error(error.localizedDescription))
             }
             resetInput()

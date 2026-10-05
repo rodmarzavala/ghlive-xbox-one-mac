@@ -14,8 +14,8 @@ public struct DongleMonitor: DongleEventSource {
     public func events() -> AsyncStream<DongleEvent> {
         AsyncStream { continuation in
             let registration = Registration(continuation: continuation, log: log)
-            registration.start()
             continuation.onTermination = { _ in registration.stop() }
+            registration.start()
         }
     }
 }
