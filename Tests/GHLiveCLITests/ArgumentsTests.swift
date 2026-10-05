@@ -1,3 +1,4 @@
+import Foundation
 import GHLiveCore
 import GuitarInput
 import KeyMapping
@@ -57,12 +58,21 @@ struct ArgumentsTests {
         #expect(throws: ArgumentError.missingValue("--print-preset")) {
             try parseArguments(["keymap", "--print-preset"])
         }
+        #expect(throws: ArgumentError.missingValue("--print-preset")) {
+            try parseArguments(["keymap", "--print-preset", "--verbose"])
+        }
         #expect(throws: ArgumentError.invalidValue("seven-fret", option: "--print-preset")) {
             try parseArguments(["keymap", "--print-preset", "seven-fret"])
         }
         #expect(throws: ArgumentError.unknownOption("extra", command: "keymap")) {
             try parseArguments(["keymap", "--print-preset", "five-fret", "extra"])
         }
+    }
+
+    @Test("keymap --print-preset prints the keymap of that preset", arguments: KeymapPreset.allCases)
+    func printedJSONRoundTripsToThePreset(preset: KeymapPreset) throws {
+        let json = try keymapJSON(for: preset)
+        #expect(try Keymap.parse(json: Data(json.utf8)) == preset.keymap)
     }
 
     @Test("the usage text lists every preset")

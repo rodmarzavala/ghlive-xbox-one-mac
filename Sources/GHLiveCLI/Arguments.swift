@@ -78,11 +78,12 @@ private func parseKeymapOptions(_ arguments: [String]) throws -> Command {
         return try requireOnlyOption(
             printDefaultOption, in: arguments, command: "keymap", result: .printKeymap(.sixFret))
     }
-    guard let name = arguments.dropFirst().first else { throw ArgumentError.missingValue(printPresetOption) }
+    var remaining = arguments.dropFirst()
+    let name = try takeValue(from: &remaining, for: printPresetOption)
     guard let preset = KeymapPreset(rawValue: name) else {
         throw ArgumentError.invalidValue(name, option: printPresetOption)
     }
-    return try requireNoOptions(Array(arguments.dropFirst(2)), command: "keymap", result: .printKeymap(preset))
+    return try requireNoOptions(Array(remaining), command: "keymap", result: .printKeymap(preset))
 }
 
 private func parseRunOptions(_ arguments: [String]) throws -> RunOptions {
@@ -93,14 +94,17 @@ private func parseRunOptions(_ arguments: [String]) throws -> RunOptions {
         case "--dry-run": options.dryRun = true
         case "--verbose": options.verbose = true
         case "--keymap":
-            guard let path = remaining.popFirst(), !path.hasPrefix("--") else {
-                throw ArgumentError.missingValue(argument)
-            }
-            options.keymapPath = path
+            options.keymapPath = try takeValue(from: &remaining, for: argument)
         default: throw ArgumentError.unknownOption(argument, command: "run")
         }
     }
     return options
+}
+
+/// The value after an option; another option in its place means the value was left out.
+private func takeValue(from remaining: inout ArraySlice<String>, for option: String) throws -> String {
+    guard let value = remaining.popFirst(), !value.hasPrefix("--") else { throw ArgumentError.missingValue(option) }
+    return value
 }
 
 private func requireNoOptions(_ arguments: [String], command: String, result: Command) throws -> Command {

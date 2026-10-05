@@ -51,9 +51,13 @@ func execute(_ command: Command) async -> Int32 {
     }
 }
 
+func keymapJSON(for preset: KeymapPreset) throws -> String {
+    String(decoding: try preset.keymap.jsonData(), as: UTF8.self)
+}
+
 private func printKeymap(_ preset: KeymapPreset) -> Int32 {
     do {
-        printLine(String(decoding: try preset.keymap.jsonData(), as: UTF8.self))
+        printLine(try keymapJSON(for: preset))
         return ExitCode.success
     } catch {
         printError("cannot encode the \(preset.rawValue) keymap: \(error)")
