@@ -357,4 +357,60 @@ struct GuitarDriverTests {
         #expect(seen[0].0 == .sent)
         await driver.stop()
     }
+
+    @Test("stop returns promptly even when a write is stalled")
+    func stopWithStalledWrite() async {
+        let transport = FakeTransport()
+        transport.stallWrites()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        #expect(await eventually { transport.stalledWriteCount == 1 })
+
+        let started = ContinuousClock.now
+        await harness.driver.stop()
+        #expect(ContinuousClock.now - started < .seconds(1))
+        #expect(transport.closed)
+        #expect(harness.driver.status == .waitingForDongle)
+    }
+
+    @Test("a failed keep-alive write releases the keys, reports the error and reconnects")
+    func keepAliveWriteFailure() async {
+        let first = FakeTransport()
+        let second = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(first), .success(second)]))
+        await harness.arrive(waitingFor: first)
+        first.feed(guitarMessage(report([fretOffset: fretBlack1])))
+        #expect(await eventually { harness.emitter.events == [.down(key("1"))] })
+
+        first.failWrites(from: 0)
+        harness.clock.advance(by: GipSession.keepAliveInterval + 0.1)
+        #expect(
+            await eventually {
+                if case .error = harness.driver.status { return true }
+                return false
+            }
+        )
+        #expect(await eventually { harness.emitter.events == [.down(key("1")), .up(key("1"))] })
+        #expect(await eventually { second.written.count == 4 })
+        #expect(first.closed)
+        await harness.driver.stop()
+    }
+
+    @Test("the tilt state does not leak across a reconnect")
+    func detectorResetsOnReconnect() async {
+        let first = FakeTransport()
+        let second = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(first), .success(second)]))
+        await harness.arrive(waitingFor: first)
+        first.feed(guitarMessage(report([tiltOffset: raisedTilt])))
+        #expect(await eventually { harness.driver.activeControls == [.tilt] })
+        first.fail(DongleError.disconnected)
+        #expect(await eventually { second.written.count == 4 })
+
+        let insideBand = UInt8(Thresholds.defaultTilt - 5)
+        second.feed(guitarMessage(report([tiltOffset: insideBand, fretOffset: fretBlack1])))
+        #expect(await eventually { harness.driver.activeControls == [.black1] })
+        await harness.driver.stop()
+    }
 }

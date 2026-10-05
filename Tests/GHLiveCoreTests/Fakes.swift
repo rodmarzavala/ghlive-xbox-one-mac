@@ -44,7 +44,10 @@ func key(_ name: String) -> KeyCode { KeyCode.named(name)! }
 final class FakeTransport: PacketTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var writtenData: [Data] = []
-    private var closeCount = 0
+    private var isClosed = false
+    private var stallsWrites = false
+    private var stalledWrites: [CheckedContinuation<Void, Error>] = []
+    private var failingFromWrite: Int?
     private let stream: AsyncThrowingStream<Data, Error>
     private let continuation: AsyncThrowingStream<Data, Error>.Continuation
 
@@ -53,7 +56,13 @@ final class FakeTransport: PacketTransport, @unchecked Sendable {
     }
 
     var written: [Data] { lock.withLock { writtenData } }
-    var closed: Bool { lock.withLock { closeCount > 0 } }
+    var closed: Bool { lock.withLock { isClosed } }
+    var stalledWriteCount: Int { lock.withLock { stalledWrites.count } }
+
+    /// Every write hangs until `close()`, like a write to a wedged USB pipe.
+    func stallWrites() { lock.withLock { stallsWrites = true } }
+    /// The write with this zero-based index, and every later one, throws.
+    func failWrites(from index: Int) { lock.withLock { failingFromWrite = index } }
 
     func feed(_ data: Data) { continuation.yield(data) }
     func fail(_ error: Error) { continuation.finish(throwing: error) }
@@ -62,11 +71,28 @@ final class FakeTransport: PacketTransport, @unchecked Sendable {
     func incomingPackets() -> AsyncThrowingStream<Data, Error> { stream }
 
     func write(_ data: Data) async throws {
+        let shouldFail = lock.withLock { failingFromWrite.map { writtenData.count >= $0 } ?? false }
+        if shouldFail { throw DongleError.disconnected }
+        if lock.withLock({ stallsWrites }) {
+            try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, Error>) in
+                let alreadyClosed = lock.withLock {
+                    if !isClosed { stalledWrites.append(waiter) }
+                    return isClosed
+                }
+                if alreadyClosed { waiter.resume(throwing: DongleError.disconnected) }
+            }
+            return
+        }
         lock.withLock { writtenData.append(data) }
     }
 
     func close() {
-        lock.withLock { closeCount += 1 }
+        let waiters = lock.withLock {
+            isClosed = true
+            defer { stalledWrites = [] }
+            return stalledWrites
+        }
+        for waiter in waiters { waiter.resume(throwing: DongleError.disconnected) }
         continuation.finish()
     }
 }

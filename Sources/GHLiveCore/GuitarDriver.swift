@@ -174,7 +174,12 @@ public final class GuitarDriver: ObservableObject {
             setStatus(.connecting)
             do {
                 let transport = try await connector.connect()
-                try await run(on: transport)
+                // A write to a wedged pipe never completes; closing the transport is what unblocks it.
+                try await withTaskCancellationHandler {
+                    try await run(on: transport)
+                } onCancel: {
+                    transport.close()
+                }
                 if Task.isCancelled { break }
                 setStatus(.error(DongleError.disconnected.localizedDescription))
             } catch is CancellationError {
@@ -226,7 +231,7 @@ public final class GuitarDriver: ObservableObject {
                 try await handle(packet, over: transport)
             }
             if let failure = transfer.failure {
-                log("undecodable bytes (\(failure.error)): \(hex(failure.tail))")
+                log("undecodable bytes (\(failure.error)): \(failure.tail.hexString)")
             }
         }
     }
@@ -295,9 +300,5 @@ public final class GuitarDriver: ObservableObject {
         guard status != newStatus else { return }
         status = newStatus
         log("status: \(newStatus)")
-    }
-
-    private func hex(_ data: Data) -> String {
-        data.map { String(format: "%02x", $0) }.joined(separator: " ")
     }
 }

@@ -111,7 +111,7 @@ private func sniff() async -> Int32 {
         packetObserver: { direction, packet in
             let label = direction == .received ? "rx" : "tx"
             let name = packet.knownCommand.map { "\($0)" } ?? "unknown"
-            printLine("\(label) \(name) \(packet.encoded().map { String(format: "%02x", $0) }.joined(separator: " "))")
+            printLine("\(label) \(name) \(packet.encoded().hexString)")
         }
     )
     driver.start()
