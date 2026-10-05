@@ -1,5 +1,6 @@
 import io
 import unittest
+from collections.abc import Callable
 
 from ghlproto.gip import GipCommand, GipFlag, GipPacket, decode_packet, encode_packet
 from ghlproto.packet_log import PacketLogger
@@ -51,11 +52,16 @@ class InterruptingTransport(FakeTransport):
 
 
 class RunSessionTest(unittest.TestCase):
-    def run_with(self, reads: list[bytes | None], seconds: float = RUN_SECONDS) -> tuple[FakeTransport, str]:
+    def run_with(
+        self,
+        reads: list[bytes | None],
+        seconds: float = RUN_SECONDS,
+        on_packet: Callable[[GipPacket], None] | None = None,
+    ) -> tuple[FakeTransport, str]:
         clock = FakeClock()
         transport = FakeTransport(clock, reads)
         out = io.StringIO()
-        run_session(transport, PacketLogger(False, clock=clock, out=out), seconds, clock=clock)
+        run_session(transport, PacketLogger(False, clock=clock, out=out), seconds, clock=clock, on_packet=on_packet)
         return transport, out.getvalue()
 
     def test_starts_with_power_led_auth_then_keep_alive(self):
@@ -84,6 +90,22 @@ class RunSessionTest(unittest.TestCase):
         transport, output = self.run_with([encode_packet(status) + encode_packet(guitar)])
         self.assertIn("GHL_GUITAR_INPUT", output)
         self.assertIn(4, [p.sequence for p in transport.writes if p.command == GipCommand.ACKNOWLEDGE])
+
+    def test_on_packet_receives_every_decoded_packet_even_repeated_ones(self):
+        guitar = encode_packet(GipPacket(GipCommand.GHL_GUITAR_INPUT, 0, 5, bytes(27)))
+        status = encode_packet(GipPacket(GipCommand.STATUS, GipFlag.SYSTEM, 4, bytes([0x83])))
+        received: list[GipPacket] = []
+        self.run_with([guitar + status, guitar], on_packet=received.append)
+        self.assertEqual(
+            [packet.command for packet in received],
+            [GipCommand.GHL_GUITAR_INPUT, GipCommand.STATUS, GipCommand.GHL_GUITAR_INPUT],
+        )
+
+    def test_on_packet_still_receives_complete_messages_before_a_bad_tail(self):
+        status = encode_packet(GipPacket(GipCommand.STATUS, GipFlag.SYSTEM, 4, bytes([0x83])))
+        received: list[GipPacket] = []
+        self.run_with([status + bytes([0x21, 0x00, 0x05, 0x1B])], on_packet=received.append)
+        self.assertEqual([packet.command for packet in received], [GipCommand.STATUS])
 
     def test_truncated_tail_is_logged_after_the_complete_messages(self):
         status = encode_packet(GipPacket(GipCommand.STATUS, GipFlag.SYSTEM, 4, bytes([0x83])))
