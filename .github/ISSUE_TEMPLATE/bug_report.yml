@@ -1,0 +1,54 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check the [troubleshooting guide](https://github.com/rodmarzavala/ghlive-xbox-one-mac/blob/develop/docs/troubleshooting.md) first.
+        Do not include your dongle's serial number or any personal data.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 14.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Mac chip
+      options:
+        - Apple Silicon (M1 or later)
+        - Intel
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GHLive version
+      description: Menu -> About GHLive, or run `ghlive --version`.
+      placeholder: "e.g. 0.1.0-beta.1"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, what did you see, and what does the menu's status line say?
+    validations:
+      required: true
+  - type: textarea
+    id: sniff
+    attributes:
+      label: "`ghlive sniff` output (optional)"
+      description: See [capturing a packet log](https://github.com/rodmarzavala/ghlive-xbox-one-mac/blob/develop/CONTRIBUTING.md#capturing-a-packet-log). Remove serial numbers first.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: Accessibility access is granted to GHLive
+        - label: Steam (and other apps that read Xbox controllers) is closed
+        - label: I removed any serial numbers from the logs I pasted
