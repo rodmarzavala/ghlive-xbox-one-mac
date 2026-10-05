@@ -126,6 +126,13 @@ struct AppModelTests {
         #expect(fixture.model.monitor.keyLabel(for: .black1) == "A")
     }
 
+    @Test func savedSensitivityReachesTheGuitarTest() {
+        let fixture = AppFixture()
+        fixture.model.settings.tilt = 200
+        fixture.model.settings.commit()
+        #expect(fixture.model.guitarTest.session.thresholds.tilt == 200)
+    }
+
     @Test func aSaveFailureAppearsInTheMenuAndClearsOnTheNextSave() {
         let fixture = AppFixture()
         fixture.store.failure = StoreFailure()
