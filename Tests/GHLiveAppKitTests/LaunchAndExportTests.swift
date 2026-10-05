@@ -23,6 +23,32 @@ struct LaunchOptionsTests {
     }
 }
 
+@MainActor
+struct InitialWindowTests {
+    private let dryRun = [AppModel.dryRunVariable: "1"]
+
+    @Test func opensTheNamedWindowInDryRun() {
+        for window in AppWindow.allCases {
+            let opened = LaunchOptions.initialWindow(
+                arguments: ["--open-window", window.rawValue], environment: dryRun)
+            #expect(opened == window)
+        }
+    }
+
+    @Test func isIgnoredOutsideDryRun() {
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window", "settings"], environment: [:]) == nil)
+        #expect(
+            LaunchOptions.initialWindow(
+                arguments: ["--open-window", "settings"], environment: [AppModel.dryRunVariable: "0"]) == nil)
+    }
+
+    @Test func ignoresMissingOrUnknownValues() {
+        #expect(LaunchOptions.initialWindow(arguments: [], environment: dryRun) == nil)
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window"], environment: dryRun) == nil)
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window", "about"], environment: dryRun) == nil)
+    }
+}
+
 struct VersionTests {
     @Test func versionFileMatchesTheCode() throws {
         let root = URL(fileURLWithPath: #filePath)
