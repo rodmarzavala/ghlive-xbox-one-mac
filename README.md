@@ -45,6 +45,18 @@ docs/    Protocol notes and references
 
 The final application will be a Swift package built on Apple's `IOUSBHost` framework.
 
+## Building from source (Swift)
+
+```
+make build     # swift build
+make test      # swift test (adds the Swift Testing flag when only Command Line Tools are installed)
+make lint      # swift format lint
+make release   # universal arm64 + x86_64 release build
+swift run ghlive run --dry-run --verbose
+```
+
+See [docs/architecture.md](docs/architecture.md) for the module layout.
+
 ## Development
 
 See [tools/README.md](tools/README.md) for setup, lint and tests.
