@@ -6,3 +6,4 @@ __pycache__/
 .swiftpm/
 .DS_Store
 captures/
+dist/
