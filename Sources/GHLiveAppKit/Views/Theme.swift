@@ -19,32 +19,195 @@ enum Metrics {
     static let strokeOpacity = 0.15
     static let hairline: CGFloat = 1
     static let emphasisBorder: CGFloat = 1.5
+    static let bannerPadding: CGFloat = 10
+    static let glassTintOpacity = 0.22
+    static let glassGroupSpacing: CGFloat = 4
+    /// Wider than `glassGroupSpacing`, or stacked glass banners would merge into one blob.
+    static let stackedBannerSpacing: CGFloat = 8
+}
+
+/// Which look the surfaces (cards, banners, buttons) take. `current` is the one place that decides.
+enum SurfaceStyle: Equatable, Sendable {
+    /// Liquid Glass, macOS 26 and later.
+    case glass
+    /// Flat translucent fills drawn in SwiftUI, for older systems and for `ImageRenderer`.
+    case classic
+
+    static let firstGlassMajorVersion = 26
+
+    /// Whether this build has the glass APIs: Xcode 26 ships Swift 6.2.
+    static var sdkHasGlass: Bool {
+        #if compiler(>=6.2)
+            true
+        #else
+            false
+        #endif
+    }
+
+    static func resolve(osMajorVersion: Int, sdkHasGlass: Bool) -> SurfaceStyle {
+        sdkHasGlass && osMajorVersion >= firstGlassMajorVersion ? .glass : .classic
+    }
+
+    static let current: SurfaceStyle = resolve(
+        osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion, sdkHasGlass: sdkHasGlass)
+}
+
+private struct SurfaceStyleKey: EnvironmentKey {
+    static let defaultValue = SurfaceStyle.current
+}
+
+extension EnvironmentValues {
+    /// Screenshots set `.classic`: `ImageRenderer` cannot draw real glass.
+    var surfaceStyle: SurfaceStyle {
+        get { self[SurfaceStyleKey.self] }
+        set { self[SurfaceStyleKey.self] = newValue }
+    }
+}
+
+// Every use of the macOS 26 glass APIs, and every `#available` check, lives in this section.
+
+#if compiler(>=6.2)
+    @available(macOS 26, *)
+    extension View {
+        fileprivate func glassSurface(tint: Color?) -> some View {
+            let glass = tint.map { Glass.regular.tint($0.opacity(Metrics.glassTintOpacity)) } ?? Glass.regular
+            return glassEffect(
+                glass, in: RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous))
+        }
+    }
+#endif
+
+private struct CardSurface: ViewModifier {
+    let emphasis: Color?
+    @Environment(\.surfaceStyle) private var style
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+            if #available(macOS 26, *), style == .glass {
+                padded(content).glassSurface(tint: emphasis)
+            } else {
+                classic(content)
+            }
+        #else
+            classic(content)
+        #endif
+    }
+
+    private func padded(_ content: Content) -> some View {
+        content.padding(Metrics.cardPadding).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func classic(_ content: Content) -> some View {
+        let border = emphasis ?? Color.primary.opacity(Metrics.strokeOpacity)
+        let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+        return padded(content)
+            .background(shape.fill(Color.primary.opacity(Metrics.cardFillOpacity)))
+            .overlay(shape.stroke(border, lineWidth: emphasis == nil ? Metrics.hairline : Metrics.emphasisBorder))
+    }
+}
+
+private struct BannerSurface: ViewModifier {
+    let tint: Color
+    let classicPadding: EdgeInsets
+    @Environment(\.surfaceStyle) private var style
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+            if #available(macOS 26, *), style == .glass {
+                content.padding(Metrics.bannerPadding).frame(maxWidth: .infinity, alignment: .leading)
+                    .glassSurface(tint: tint)
+            } else {
+                content.padding(classicPadding)
+            }
+        #else
+            content.padding(classicPadding)
+        #endif
+    }
+}
+
+private struct ButtonSurface: ViewModifier {
+    let prominent: Bool
+    @Environment(\.surfaceStyle) private var style
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+            if #available(macOS 26, *), style == .glass {
+                if prominent {
+                    content.buttonStyle(.glassProminent)
+                } else {
+                    content.buttonStyle(.glass)
+                }
+            } else {
+                classic(content)
+            }
+        #else
+            classic(content)
+        #endif
+    }
+
+    @ViewBuilder
+    private func classic(_ content: Content) -> some View {
+        if prominent {
+            content.buttonStyle(PillButtonStyle())
+        } else {
+            content.buttonStyle(SecondaryButtonStyle())
+        }
+    }
+}
+
+/// Lets glass elements that sit together share one sampling region; a plain pass-through otherwise.
+struct GlassGroup<Content: View>: View {
+    private let content: Content
+    @Environment(\.surfaceStyle) private var style
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        #if compiler(>=6.2)
+            if #available(macOS 26, *), style == .glass {
+                GlassEffectContainer(spacing: Metrics.glassGroupSpacing) { content }
+            } else {
+                content
+            }
+        #else
+            content
+        #endif
+    }
+}
+
+extension View {
+    /// A panel. `emphasis` marks a card that must stand out: an outline, or a glass tint.
+    func ghCard(emphasis: Color? = nil) -> some View {
+        modifier(CardSurface(emphasis: emphasis))
+    }
+
+    /// A tinted glass strip; on older systems the content stays bare, with only `classicPadding`.
+    func ghBanner(tint: Color, classicPadding: EdgeInsets = EdgeInsets()) -> some View {
+        modifier(BannerSurface(tint: tint, classicPadding: classicPadding))
+    }
+
+    func ghButtonStyle(prominent: Bool) -> some View {
+        modifier(ButtonSurface(prominent: prominent))
+    }
 }
 
 struct Card<Content: View>: View {
-    private let border: Color
-    private let borderWidth: CGFloat
+    private let emphasis: Color?
     private let content: Content
 
-    /// `border` replaces the neutral outline, for cards that must stand out.
-    init(border: Color? = nil, @ViewBuilder content: () -> Content) {
-        self.border = border ?? Color.primary.opacity(Metrics.strokeOpacity)
-        borderWidth = border == nil ? Metrics.hairline : Metrics.emphasisBorder
+    init(emphasis: Color? = nil, @ViewBuilder content: () -> Content) {
+        self.emphasis = emphasis
         self.content = content()
     }
 
     var body: some View {
-        content
-            .padding(Metrics.cardPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(Metrics.cardFillOpacity))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                    .stroke(border, lineWidth: borderWidth)
-            )
+        content.ghCard(emphasis: emphasis)
     }
 }
 

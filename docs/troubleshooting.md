@@ -43,6 +43,14 @@ With the `ghlive` command, the same condition is printed to stderr as `error: <m
 4. **Paused.** The status says "Paused". Choose Resume.
 5. **Keymap.** Check `~/Library/Application Support/GHLive/keymap.json` (menu: Open keymap folder). Settings -> Restore defaults resets it.
 
+## A control fails the guitar test
+
+Open the Input Monitor and click **Test my guitar** (see [Check that your guitar works](../README.md#check-that-your-guitar-works)). A control that never gets its green check is not being read by GHLive:
+
+- **A fret, strum direction, button or d-pad direction.** Press it again while watching the picture above the checklist. If it does not light up there, the guitar is not sending it; try fresh batteries and re-sync the guitar. If it lights up but is not checked, tell us in an issue.
+- **Whammy bar.** It needs a full press and a release. If the range stays small, check the whammy bar on the guitar itself.
+- **Tilt.** Raise the neck past the Tilt threshold, then lower it below the release level (10 under the threshold by default). If it never gets there, lower the threshold in Settings, see [Tilt triggers constantly, or never](#tilt-triggers-constantly-or-never).
+
 ## It stopped working after an update
 
 The app is ad-hoc signed, so macOS may drop its Accessibility permission when it is updated. Open System Settings -> Privacy & Security -> Accessibility, select GHLive, remove it with the minus button, then add it again (or click "Grant Accessibility access..." in the menu). Then quit and reopen GHLive.

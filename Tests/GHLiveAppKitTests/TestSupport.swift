@@ -1,5 +1,6 @@
 import Foundation
 import GHLiveCore
+import GIPProtocol
 import GuitarInput
 import KeyMapping
 import KeyboardOutput
@@ -83,14 +84,54 @@ struct AppFixture {
     let keymapFolder = FileManager.default.temporaryDirectory
         .appendingPathComponent("ghlive-tests-\(UUID().uuidString)", isDirectory: true)
 
-    init(isTrusted: Bool = true, pollInterval: Duration = AppModel.defaultPollInterval) {
+    init(
+        isTrusted: Bool = true, dongle: ScriptedDongle? = nil, pollInterval: Duration = AppModel.defaultPollInterval
+    ) {
         accessibility = FakeAccessibility(isTrusted: isTrusted)
         let urls = opened
-        let driver = GuitarDriver(monitor: SilentMonitor(), connector: UnreachableConnector(), sink: sink)
+        let driver = GuitarDriver(
+            monitor: dongle.map { $0 as any DongleEventSource } ?? SilentMonitor(),
+            connector: dongle.map { $0 as any DongleConnecting } ?? UnreachableConnector(), sink: sink)
         model = AppModel(
             driver: driver, emitter: RecordingEmitter(), keymap: .default, store: store,
             keymapFolder: keymapFolder, accessibility: accessibility, launchAtLogin: launchAtLogin,
             openURL: { urls.urls.append($0) },
             pollInterval: pollInterval)
     }
+}
+
+/// A dongle that is plugged in and delivers one guitar report with Black 1 held, then stays quiet.
+struct ScriptedDongle: DongleEventSource, DongleConnecting {
+    private static let black1Bit: UInt8 = 0x02
+    private static let restingWhammy: UInt8 = 0x80
+
+    func events() -> AsyncStream<DongleEvent> {
+        AsyncStream { continuation in continuation.yield(.arrived) }
+    }
+
+    func connect() async throws -> any PacketTransport {
+        ScriptedTransport(incoming: Self.black1Report())
+    }
+
+    private static func black1Report() -> Data {
+        var payload = [UInt8](repeating: 0, count: GuitarReport.length)
+        payload[GuitarReport.fretOffset] = black1Bit
+        payload[GuitarReport.whammyOffset] = restingWhammy
+        let packet = GipPacket(command: .ghlGuitarInput, flags: [], sequence: 1, payload: Data(payload))
+        return packet.encoded()
+    }
+}
+
+final class ScriptedTransport: PacketTransport, @unchecked Sendable {
+    private let stream: AsyncThrowingStream<Data, Error>
+    private let continuation: AsyncThrowingStream<Data, Error>.Continuation
+
+    init(incoming: Data) {
+        (stream, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
+        continuation.yield(incoming)
+    }
+
+    func incomingPackets() -> AsyncThrowingStream<Data, Error> { stream }
+    func write(_ data: Data) async throws {}
+    func close() { continuation.finish() }
 }

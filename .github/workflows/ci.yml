@@ -16,9 +16,15 @@ concurrency:
 jobs:
   swift:
     name: Swift build, test and lint
-    runs-on: macos-15
+    runs-on: macos-26
+    env:
+      XCODE_VERSION: "26.4"
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
       - name: Toolchain
         run: swift --version
       - name: Build
@@ -27,6 +33,23 @@ jobs:
         run: swift test
       - name: Lint
         run: make lint
+
+  swift-older-sdk:
+    name: Swift build on the Xcode 16 SDK (classic fallback)
+    runs-on: macos-15
+    env:
+      XCODE_VERSION: "16.4"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+      - name: Toolchain
+        run: swift --version
+      # Without the macOS 26 SDK the glass code is compiled out; this proves the classic fallback still builds.
+      - name: Build
+        run: swift build
 
   python:
     name: Python tools (ruff and unittest)

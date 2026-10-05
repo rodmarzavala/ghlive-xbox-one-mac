@@ -33,6 +33,7 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var recorderWarning: String?
     @Published public private(set) var hysteresisNote: String?
     @Published public private(set) var isConfirmingRestore = false
+    @Published public private(set) var pendingPreset: KeymapPreset?
     @Published public var tilt: Double
     @Published public var whammy: Double
 
@@ -100,6 +101,29 @@ public final class SettingsModel: ObservableObject {
         thresholds = Keymap.default.thresholds
         tilt = Double(thresholds.tilt)
         whammy = thresholds.whammy
+        commit()
+    }
+
+    // MARK: Presets
+
+    /// The preset the keys match exactly, or nil when the player changed any of them.
+    public var currentPreset: KeymapPreset? { KeymapPreset.matching(bindings) }
+
+    public func requestPreset(_ preset: KeymapPreset) {
+        guard preset != currentPreset else { return }
+        pendingPreset = preset
+    }
+
+    public func cancelPreset() {
+        pendingPreset = nil
+    }
+
+    /// Replaces the keys only; the player's sensitivity settings stay.
+    public func confirmPreset() {
+        guard let preset = pendingPreset else { return }
+        pendingPreset = nil
+        cancelRecording()
+        bindings = preset.keymap.bindings
         commit()
     }
 

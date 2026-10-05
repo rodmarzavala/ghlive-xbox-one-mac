@@ -4,37 +4,52 @@ import SwiftUI
 public struct MonitorView: View {
     public static let width: CGFloat = 440
 
-    private let monitor: MonitorPresentation
+    /// The "keys being sent" strip and the spacing above it: the one part that must never scroll away.
+    private static let keysStripHeight: CGFloat = 90
 
-    public init(monitor: MonitorPresentation) {
+    private let monitor: MonitorPresentation
+    private let limitsHeight: Bool
+    @ObservedObject private var guitarTest: GuitarTestModel
+
+    /// `limitsHeight` is off for screenshots: `ImageRenderer` cannot draw a scroll view.
+    public init(monitor: MonitorPresentation, guitarTest: GuitarTestModel, limitsHeight: Bool = true) {
         self.monitor = monitor
+        self.guitarTest = guitarTest
+        self.limitsHeight = limitsHeight
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            statusHeader
-            Card {
-                VStack(spacing: 16) {
-                    fretBoard
-                    HStack(alignment: .top, spacing: 20) {
-                        strumBar
-                        faceButtons
-                        dpad
+            ScrollsWithinScreen(isEnabled: limitsHeight, reservedHeight: Self.keysStripHeight) {
+                GlassGroup {
+                    VStack(alignment: .leading, spacing: 14) {
+                        statusHeader
+                        guitarTestSection
+                        Card {
+                            VStack(spacing: 16) {
+                                fretBoard
+                                HStack(alignment: .top, spacing: 20) {
+                                    strumBar
+                                    faceButtons
+                                    dpad
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        Card {
+                            VStack(alignment: .leading, spacing: 14) {
+                                whammyMeter
+                                tiltMeter
+                                Text("A key is sent when the bar crosses the line. Adjust in Settings.")
+                                    .font(.caption).foregroundColor(.secondary)
+                            }
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            Card {
-                VStack(alignment: .leading, spacing: 14) {
-                    whammyMeter
-                    tiltMeter
-                    Text("A key is sent when the bar crosses the line. Adjust in Settings.")
-                        .font(.caption).foregroundColor(.secondary)
                 }
             }
             keysBeingSent
         }
-        .padding(20)
+        .padding(ScreenFit.contentPadding)
         .frame(width: Self.width)
     }
 
@@ -52,7 +67,29 @@ public struct MonitorView: View {
                 }
             }
         }
+        .ghBanner(tint: monitor.status.tone.color)
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Guitar test
+
+    private var guitarTestSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button(guitarTest.isActive ? "Stop testing" : "Test my guitar") {
+                    guitarTest.isActive.toggle()
+                }
+                .ghButtonStyle(prominent: !guitarTest.isActive)
+                if !guitarTest.isActive {
+                    Text("Press every control once to check it works.")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            if guitarTest.isActive {
+                GuitarTestPanel(session: guitarTest.session, onStartOver: guitarTest.startOver)
+            }
+        }
     }
 
     // MARK: Buttons

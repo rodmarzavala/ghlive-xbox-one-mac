@@ -41,7 +41,10 @@ let package = Package(
         .testTarget(name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput"]),
         .testTarget(
             name: "GHLiveAppKitTests",
-            dependencies: ["GHLiveAppKit", "GHLiveCore", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
+            dependencies: [
+                "GHLiveAppKit", "GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput",
+                "USBTransport",
+            ]
         ),
     ]
 )

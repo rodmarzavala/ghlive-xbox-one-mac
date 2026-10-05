@@ -14,7 +14,7 @@ GIPProtocol, GuitarInput, USBTransport: no dependencies on the other targets
 |---|---|
 | `GIPProtocol` | GIP framing (varint length), `decodePackets` for bundled transfers, packet builders, `SequenceCounter`, `GipSession` (handshake packets, ACKs, 8 s keep-alive). Pure, no I/O. |
 | `GuitarInput` | `parseGuitarReport` (0x21 layout), `GuitarState`, `Control`, `Thresholds`, `HysteresisDetector`, `ControlDetector`. Pure. |
-| `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
+| `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeymapPreset` (6-fret and 5-fret key sets), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
 | `KeyboardOutput` | `OutputSink` and `KeyEmitter` protocols, `KeyboardSink` (key diffs, shared keys, `releaseAll`), `CGEventKeyEmitter`, `DryRunKeyEmitter`, `AccessibilityPermission`. |
 | `USBTransport` | `PacketTransport`, `DongleConnecting`, `DongleEventSource` protocols; IOUSBHost `DongleConnection`; IOKit `DongleMonitor`. The only target that touches IOKit. |
 | `GHLiveCLI` | Argument parsing, the `run`, `sniff` and `keymap` commands and the verbose reporter, as a library so it is testable. `ghlive` is a one-line `main.swift` calling `runCLI`. |
@@ -38,6 +38,10 @@ GipSession.duePackets(now:) every tick --> keep-alive write
 - IOKit callbacks (read completions, device notifications) run on private dispatch queues and only `yield` into `AsyncStream`s. The driver consumes those streams on the main actor, so no locks are needed in the logic.
 - Reads and writes are asynchronous (`enqueueIORequest`). Interrupt pipes require `completionTimeout: 0`, so a request on a wedged pipe has no timeout of its own: the driver ends it by closing the transport when its task is cancelled (`stop()`, dongle removal), which aborts the pending I/O. The read stream keeps only the newest 64 transfers, so a stalled consumer never replays stale input.
 - Per connection the driver runs a reader task and a tick task (keep-alive and guitar-silence check). Cancelling the driver task tears both down, closes the dongle and releases all keys.
+
+## Look
+
+On macOS 26 and later the cards, banners and buttons use Liquid Glass; older systems get flat translucent fills. `SurfaceStyle.current` (in `Theme.swift`) is the only switch, and the glass APIs sit behind `#if compiler(>=6.2)` so the package still builds with an older Xcode (CI builds it on macos-15 with Xcode 16 to prove it). `--export-screenshots` renders the classic look, because `ImageRenderer` cannot draw real glass.
 
 ## Safety guarantees
 

@@ -26,6 +26,7 @@ macOS ships no driver for this dongle: it stays unconfigured and its LED never t
 - Automatic reconnection: plug or unplug the dongle at any time.
 - Settings window: click a control, press a key, done. Changes save automatically, and there is a "Restore defaults" button.
 - Input Monitor: live frets, strum, buttons, d-pad, whammy and tilt meters with their thresholds, plus the keys currently being sent.
+- "Test my guitar": a checklist in the Input Monitor that confirms every control is read correctly.
 - Adjustable tilt and whammy thresholds.
 - Pause and Resume from the menu.
 - A command-line tool, `ghlive`, for diagnostics and headless use.
@@ -74,6 +75,10 @@ Your keymap is stored in `~/Library/Application Support/GHLive/keymap.json`.
 
 In Settings (controls are grouped under Frets, Strum bar, Buttons, D-pad, and Whammy bar and tilt), click a control, then press the key you want. Supported keys: A-Z, 0-9, the arrow keys, Space, Tab, Return, Escape and F1-F12.
 
+### Presets
+
+Settings has a **Preset** row at the top. **6-fret (GHL charts)** is the default above. **5-fret (classic charts)** maps the guitar onto five lanes (see [Playing classic 5-fret charts](#playing-classic-5-fret-charts)). Choosing a preset replaces your keys after a confirmation and keeps your tilt and whammy settings; the row shows "Custom keys" once you change a key yourself.
+
 ## Set up Clone Hero
 
 GHLive makes the guitar look like a keyboard, so the game needs to know which key is which control. Clone Hero supports 6-fret (GHL) guitars, and its controls can be bound to keys. In the game's controller settings, bind each guitar control to the key GHLive sends for it, using the table above (or your own keys from GHLive's Settings). Keep the game as the active window while you play: macOS delivers key presses to the app in front.
@@ -81,6 +86,38 @@ GHLive makes the guitar look like a keyboard, so the game needs to know which ke
 [YARG](https://yarg.in/) works the same way, since it accepts keyboard input: bind the keys in its own controller settings.
 
 The exact menu names differ between game versions, so this guide does not spell them out. The Input Monitor helps here: it shows which key each control is sending right now.
+
+### Playing classic 5-fret charts
+
+Many charts are 5-fret only. To play a 5-fret chart with the 6-fret guitar:
+
+1. In GHLive's Settings, choose the **5-fret (classic charts)** preset and confirm.
+2. In the game, bind the keyboard as a regular 5-fret guitar using the keys `1` to `5` for Green, Red, Yellow, Blue and Orange. The strum bar, Hero Power (Star Power), whammy and pause keys are the same as in the table above.
+
+| Lane | Key | Guitar control |
+|---|---|---|
+| Green | `1` | White 1 (bottom row), or Black 1 |
+| Red | `2` | White 2 (bottom row) |
+| Yellow | `3` | White 3 (bottom row) |
+| Blue | `4` | Black 2 (top row) |
+| Orange | `5` | Black 3 (top row) |
+
+Black 1 also sends Green so the first column is comfortable from either row. This layout is a starting point: click any control in Settings to give it another key.
+
+![Settings with the 5-fret preset applied](docs/images/settings-preset-five-fret-light.png)
+
+## Check that your guitar works
+
+Before you open Clone Hero, confirm in about a minute that every control is read correctly.
+
+1. Open **Input Monitor...** from the menu and click **Test my guitar**.
+2. Press every fret, both strum directions, Hero Power, Pause, GHTV and each d-pad direction once. Each one gets a green check the first time it is seen.
+3. Push the whammy bar all the way down and let it go back, then raise the guitar neck past the tilt threshold and lower it again. Both rows show the range they have seen.
+4. When all 17 controls are checked, the monitor says "All controls work. You're ready to play."
+
+**Start over** clears the checks. Losing the guitar's connection does not. If a control never gets its check, see [Troubleshooting](#troubleshooting).
+
+![The Input Monitor in test mode, part-way through](docs/images/monitor-guitar-test-light.png)
 
 ## Calibrating tilt and whammy
 
@@ -127,6 +164,7 @@ Other useful commands:
 swift scripts/make-icon.swift Resources/AppIcon.icns   # regenerate the app icon
 GHLIVE_DRY_RUN=1 swift run GHLiveApp                    # GUI that posts no keys
 swift run GHLiveApp --export-screenshots <dir>          # render the UI states to PNG files
+GHLIVE_DRY_RUN=1 swift run GHLiveApp --open-window settings   # also: monitor; opens that window at launch
 ```
 
 You are encouraged to compare the contents of your locally built zip with the release. The binaries will not be bit-identical, but you can compare the file list and `Info.plist`.
@@ -137,6 +175,7 @@ You are encouraged to compare the contents of your locally built zip with the re
 ghlive run [--dry-run] [--verbose] [--keymap PATH]   wait for the dongle and send key presses
 ghlive sniff                                          print the raw GIP packets (for bug reports)
 ghlive keymap --print-default                         print the default keymap as JSON
+ghlive keymap --print-preset five-fret|six-fret       print a keymap preset as JSON
 ghlive --version
 ```
 
@@ -149,6 +188,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **The dongle LED does not turn on.** Check the status line in the menu. If it says the dongle is in use by another app, see below. Otherwise unplug and replug it.
 - **The guitar does not sync.** Switch the guitar on once the status reads "Dongle ready".
 - **"The dongle is in use by another app".** Quit Steam, or any other app that reads Xbox controllers. GHLive retries every few seconds.
+- **A control never gets its check in "Test my guitar".** The Input Monitor does not see it: see [Check that your guitar works](#check-that-your-guitar-works) and [docs/troubleshooting.md](docs/troubleshooting.md#a-control-fails-the-guitar-test).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.
