@@ -22,12 +22,16 @@ public struct SettingsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
-            HStack(alignment: .top, spacing: 20) {
-                column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+            GlassGroup {
                 VStack(alignment: .leading, spacing: 14) {
-                    ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) { groupCard($0) }
-                    thresholdsCard
+                    if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
+                    HStack(alignment: .top, spacing: 20) {
+                        column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) { groupCard($0) }
+                            thresholdsCard
+                        }
+                    }
                 }
             }
             footer
@@ -70,7 +74,7 @@ public struct SettingsView: View {
     }
 
     private func unreadableKeymapCard(_ detail: String) -> some View {
-        Card(border: .red) {
+        Card(emphasis: .red) {
             VStack(alignment: .leading, spacing: 6) {
                 NoticeLabel(
                     text: SettingsCopy.unreadableKeymapHeadline, symbol: "xmark.octagon.fill", color: .red
@@ -82,7 +86,7 @@ public struct SettingsView: View {
                     .font(.caption).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Open keymap folder", action: model.onOpenKeymapFolder)
-                    .buttonStyle(SecondaryButtonStyle())
+                    .ghButtonStyle(prominent: false)
             }
         }
     }
@@ -162,7 +166,7 @@ public struct SettingsView: View {
         HStack(alignment: .top, spacing: 16) {
             messageView.frame(maxWidth: .infinity, alignment: .leading)
             Button("Restore defaults", action: model.requestRestoreDefaults)
-                .buttonStyle(SecondaryButtonStyle())
+                .ghButtonStyle(prominent: false)
         }
     }
 

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- On macOS 26 and later the menu, Settings and Input Monitor use Liquid Glass; older systems keep the current look.
+
 ## [0.1.0-beta.1] - 2026-10-05
 
 First public beta.

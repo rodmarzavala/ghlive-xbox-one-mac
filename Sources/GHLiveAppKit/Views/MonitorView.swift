@@ -12,24 +12,28 @@ public struct MonitorView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            statusHeader
-            Card {
-                VStack(spacing: 16) {
-                    fretBoard
-                    HStack(alignment: .top, spacing: 20) {
-                        strumBar
-                        faceButtons
-                        dpad
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            Card {
+            GlassGroup {
                 VStack(alignment: .leading, spacing: 14) {
-                    whammyMeter
-                    tiltMeter
-                    Text("A key is sent when the bar crosses the line. Adjust in Settings.")
-                        .font(.caption).foregroundColor(.secondary)
+                    statusHeader
+                    Card {
+                        VStack(spacing: 16) {
+                            fretBoard
+                            HStack(alignment: .top, spacing: 20) {
+                                strumBar
+                                faceButtons
+                                dpad
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    Card {
+                        VStack(alignment: .leading, spacing: 14) {
+                            whammyMeter
+                            tiltMeter
+                            Text("A key is sent when the bar crosses the line. Adjust in Settings.")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
             keysBeingSent
@@ -52,6 +56,7 @@ public struct MonitorView: View {
                 }
             }
         }
+        .ghBanner(tint: monitor.status.tone.color)
         .accessibilityElement(children: .combine)
     }
 

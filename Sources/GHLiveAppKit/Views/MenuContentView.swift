@@ -38,6 +38,9 @@ public struct MenuActions {
 public struct MenuContentView: View {
     public static let width: CGFloat = 320
 
+    private static let noticePadding = EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+    private static let warningPadding = EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
+
     private let menu: MenuPresentation
     private let actions: MenuActions
 
@@ -48,9 +51,13 @@ public struct MenuContentView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            statusHeader
-            if menu.needsAccessibility { accessibilityCard }
-            if let problem = menu.keymapProblem { warning(problem) }
+            GlassGroup {
+                VStack(alignment: .leading, spacing: 10) {
+                    statusHeader
+                    if menu.needsAccessibility { accessibilityCard }
+                    if let problem = menu.keymapProblem { warning(problem) }
+                }
+            }
             VStack(alignment: .leading, spacing: 0) {
                 MenuRow(title: menu.pauseTitle, symbol: menu.isPaused ? "play.fill" : "pause.fill") {
                     actions.togglePause()
@@ -63,8 +70,12 @@ public struct MenuContentView: View {
                     symbol: menu.launchesAtLogin ? "checkmark.square.fill" : "square",
                     isSelected: menu.launchesAtLogin
                 ) { actions.setLaunchAtLogin(!menu.launchesAtLogin) }
-                if menu.launchAtLoginNeedsApproval { loginItemApproval }
-                if let problem = menu.launchAtLoginProblem { warning(problem) }
+                GlassGroup {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if menu.launchAtLoginNeedsApproval { loginItemApproval }
+                        if let problem = menu.launchAtLoginProblem { warning(problem) }
+                    }
+                }
                 MenuRow(title: "Open keymap folder", symbol: "folder", action: actions.openKeymapFolder)
                 Divider().padding(.vertical, 4)
                 MenuRow(title: "About GHLive", symbol: "info.circle", action: actions.showAbout)
@@ -88,6 +99,7 @@ public struct MenuContentView: View {
                 }
             }
         }
+        .ghBanner(tint: menu.status.tone.color)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             [menu.status.headline, menu.status.detail].compactMap { $0 }.joined(separator: ". ")
@@ -95,7 +107,7 @@ public struct MenuContentView: View {
     }
 
     private var accessibilityCard: some View {
-        Card(border: .orange) {
+        Card(emphasis: .orange) {
             VStack(alignment: .leading, spacing: 8) {
                 Label {
                     Text("Allow GHLive to press keys").font(.subheadline.weight(.semibold))
@@ -111,7 +123,7 @@ public struct MenuContentView: View {
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 Button("Grant Accessibility access\u{2026}", action: actions.grantAccessibility)
-                    .buttonStyle(PillButtonStyle())
+                    .ghButtonStyle(prominent: true)
                     .accessibilityHint("Opens System Settings, Privacy and Security, Accessibility")
             }
         }
@@ -125,16 +137,15 @@ public struct MenuContentView: View {
             )
             .font(.caption)
             Button("Open Login Items\u{2026}", action: actions.openLoginItems)
-                .buttonStyle(SecondaryButtonStyle())
+                .ghButtonStyle(prominent: false)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .ghBanner(tint: .orange, classicPadding: Self.noticePadding)
     }
 
     private func warning(_ text: String) -> some View {
         NoticeLabel(text: text, symbol: "exclamationmark.triangle.fill", color: .red)
             .font(.caption)
-            .padding(.horizontal, 8)
+            .ghBanner(tint: .red, classicPadding: Self.warningPadding)
     }
 }
 

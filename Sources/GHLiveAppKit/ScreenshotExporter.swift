@@ -46,6 +46,7 @@ public enum ScreenshotExporter {
             view
             .background(appearance.background)
             .environment(\.colorScheme, appearance.scheme)
+            .environment(\.surfaceStyle, .classic)
         let renderer = ImageRenderer(content: content)
         renderer.scale = renderScale
         guard let image = renderer.nsImage,
