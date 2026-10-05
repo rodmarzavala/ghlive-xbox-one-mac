@@ -131,23 +131,23 @@ extension Keymap {
         return Int(value)
     }
 
-    /// The band must fit below its threshold, otherwise the release level would be negative and the
-    /// control could never switch off.
+    /// The band must stay strictly below its threshold: a band equal to it puts the release level at 0,
+    /// which every reading satisfies, so the control could never switch off.
     private static func validate(_ thresholds: Thresholds) throws {
         try require(
             thresholds.whammy > 0 && thresholds.whammy <= 1, ThresholdName.whammy, thresholds.whammy,
             "above 0 and at most 1")
         try require(
-            thresholds.whammyHysteresis >= 0 && thresholds.whammyHysteresis <= thresholds.whammy,
-            ThresholdName.whammyHysteresis, thresholds.whammyHysteresis, "between 0 and the whammy threshold"
+            (0..<thresholds.whammy).contains(thresholds.whammyHysteresis),
+            ThresholdName.whammyHysteresis, thresholds.whammyHysteresis, "0 or more and below the whammy threshold"
         )
         try require(
             (1...tiltMaximum).contains(thresholds.tilt),
             ThresholdName.tilt, Double(thresholds.tilt), "between 1 and \(tiltMaximum)"
         )
         try require(
-            (0...thresholds.tilt).contains(thresholds.tiltHysteresis),
-            ThresholdName.tiltHysteresis, Double(thresholds.tiltHysteresis), "between 0 and the tilt threshold"
+            (0..<thresholds.tilt).contains(thresholds.tiltHysteresis),
+            ThresholdName.tiltHysteresis, Double(thresholds.tiltHysteresis), "0 or more and below the tilt threshold"
         )
     }
 

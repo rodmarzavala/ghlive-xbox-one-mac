@@ -6,6 +6,38 @@ import Testing
 
 private func json(_ text: String) -> Data { Data(text.utf8) }
 
+private let whammyRange = "above 0 and at most 1"
+private let whammyBand = "0 or more and below the whammy threshold"
+private let tiltRange = "between 1 and 255"
+private let tiltBand = "0 or more and below the tilt threshold"
+
+// Lower-bound inputs carry a zero band so the band check cannot be what rejects them.
+private let outOfRangeCases: [(String, KeymapError)] = [
+    (#"{"whammy": 0, "whammy_hysteresis": 0}"#, .thresholdOutOfRange("whammy", value: 0, allowed: whammyRange)),
+    (#"{"whammy": 1.5}"#, .thresholdOutOfRange("whammy", value: 1.5, allowed: whammyRange)),
+    (#"{"whammy": -0.2, "whammy_hysteresis": 0}"#, .thresholdOutOfRange("whammy", value: -0.2, allowed: whammyRange)),
+    (#"{"whammy_hysteresis": -0.1}"#, .thresholdOutOfRange("whammy_hysteresis", value: -0.1, allowed: whammyBand)),
+    (
+        #"{"whammy": 0.3, "whammy_hysteresis": 0.4}"#,
+        .thresholdOutOfRange("whammy_hysteresis", value: 0.4, allowed: whammyBand)
+    ),
+    (
+        #"{"whammy": 0.3, "whammy_hysteresis": 0.3}"#,
+        .thresholdOutOfRange("whammy_hysteresis", value: 0.3, allowed: whammyBand)
+    ),
+    (#"{"tilt": 0, "tilt_hysteresis": 0}"#, .thresholdOutOfRange("tilt", value: 0, allowed: tiltRange)),
+    (#"{"tilt": 256, "tilt_hysteresis": 0}"#, .thresholdOutOfRange("tilt", value: 256, allowed: tiltRange)),
+    (#"{"tilt_hysteresis": -1}"#, .thresholdOutOfRange("tilt_hysteresis", value: -1, allowed: tiltBand)),
+    (
+        #"{"tilt": 100, "tilt_hysteresis": 101}"#,
+        .thresholdOutOfRange("tilt_hysteresis", value: 101, allowed: tiltBand)
+    ),
+    (
+        #"{"tilt": 100, "tilt_hysteresis": 100}"#,
+        .thresholdOutOfRange("tilt_hysteresis", value: 100, allowed: tiltBand)
+    ),
+]
+
 private func key(_ name: String) -> KeyCode { KeyCode.named(name)! }
 
 @Suite("Default keymap")
@@ -106,17 +138,9 @@ struct KeymapParsingTests {
         }
     }
 
-    @Test(
-        "out-of-range thresholds are rejected",
-        arguments: [
-            #"{"whammy": 0}"#, #"{"whammy": 1.5}"#, #"{"whammy": -0.2}"#,
-            #"{"whammy_hysteresis": -0.1}"#, #"{"whammy": 0.3, "whammy_hysteresis": 0.4}"#,
-            #"{"tilt": 0}"#, #"{"tilt": 256}"#, #"{"tilt_hysteresis": -1}"#,
-            #"{"tilt": 100, "tilt_hysteresis": 101}"#,
-        ]
-    )
-    func outOfRange(thresholds: String) {
-        #expect(throws: KeymapError.self) {
+    @Test("out-of-range thresholds are rejected with the exact error", arguments: outOfRangeCases)
+    func outOfRange(thresholds: String, expected: KeymapError) {
+        #expect(throws: expected) {
             try Keymap.parse(json: json(#"{"keys": {}, "thresholds": \#(thresholds)}"#))
         }
     }
@@ -124,9 +148,9 @@ struct KeymapParsingTests {
     @Test("boundary thresholds are accepted")
     func boundaries() throws {
         let text =
-            #"{"keys": {}, "thresholds": {"whammy": 1, "whammy_hysteresis": 1, "tilt": 255, "tilt_hysteresis": 255}}"#
+            #"{"keys": {}, "thresholds": {"whammy": 1, "whammy_hysteresis": 0.99, "tilt": 255, "tilt_hysteresis": 254}}"#
         let thresholds = try Keymap.parse(json: json(text)).thresholds
-        #expect(thresholds == Thresholds(whammy: 1, whammyHysteresis: 1, tilt: 255, tiltHysteresis: 255))
+        #expect(thresholds == Thresholds(whammy: 1, whammyHysteresis: 0.99, tilt: 255, tiltHysteresis: 254))
     }
 
     @Test("invalid JSON is a keymap error")
