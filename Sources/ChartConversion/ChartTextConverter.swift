@@ -33,8 +33,11 @@ public struct ChartTextConverter: ChartFormatConverter {
 
     public func verify(converted: Data, original: Data) throws -> Int {
         let text = try Self.decode(converted)
-        guard Self.trimmingTrailingLineFeeds(text).hasPrefix(Self.trimmingTrailingLineFeeds(try Self.decode(original)))
-        else { throw ConversionError.verificationFailed("the original chart content changed") }
+        // Bytes, not Characters: a lone CR is not a prefix of the CRLF grapheme that follows it.
+        let kept = Self.trimmingTrailingLineFeeds(try Self.decode(original))
+        guard Array(text.utf8).starts(with: Array(kept.utf8)) else {
+            throw ConversionError.verificationFailed("the original chart content changed")
+        }
         let sections = ChartText.lookup(ChartText.sections(of: text))
         var total = 0
         for difficulty in GuitarDifficulty.allCases {

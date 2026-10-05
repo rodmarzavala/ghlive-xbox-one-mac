@@ -1,6 +1,6 @@
 import Foundation
 
-public enum MIDIError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum MIDIError: Error, Equatable, Sendable, LocalizedError {
     case notAMIDIFile
     case truncated(String)
     case malformedQuantity
@@ -8,7 +8,7 @@ public enum MIDIError: Error, Equatable, Sendable, CustomStringConvertible {
     case unsupportedStatus(UInt8)
     case unsupportedFormat(Int)
 
-    public var description: String {
+    public var errorDescription: String? {
         switch self {
         case .notAMIDIFile: "not a Standard MIDI File"
         case .truncated(let what): "the MIDI file ends inside \(what)"

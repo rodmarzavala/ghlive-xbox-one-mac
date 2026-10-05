@@ -13,11 +13,11 @@ public enum ConversionAttempt: Equatable, Sendable {
     case converted(Data, addedTracks: [String])
 }
 
-public enum ConversionError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum ConversionError: Error, Equatable, Sendable, LocalizedError {
     case notUTF8
     case verificationFailed(String)
 
-    public var description: String {
+    public var errorDescription: String? {
         switch self {
         case .notUTF8: "the chart is not valid UTF-8"
         case .verificationFailed(let detail): "verification failed: \(detail)"

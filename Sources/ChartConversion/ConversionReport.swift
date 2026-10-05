@@ -53,13 +53,20 @@ public struct ConversionReport: Equatable, Sendable {
 
     public var failedCount: Int { results.filter(\.isFailure).count }
     public var hasFailures: Bool { failedCount > 0 }
-    public var skippedCount: Int { results.count - convertedCount - failedCount }
+    public var skippedCount: Int {
+        results.filter {
+            switch $0.outcome {
+            case .alreadyHasSixFret, .noFiveFretTrack, .unsupportedFormat: true
+            case .converted, .failed: false
+            }
+        }.count
+    }
 }
 
-public enum LibraryError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum LibraryError: Error, Equatable, Sendable, LocalizedError {
     case notAFolder(String)
 
-    public var description: String {
+    public var errorDescription: String? {
         switch self {
         case .notAFolder(let path): "'\(path)' is not a folder"
         }

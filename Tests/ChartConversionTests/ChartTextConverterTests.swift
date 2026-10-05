@@ -156,6 +156,16 @@ struct ChartTextConverterTests {
         #expect(count == fiveFretNotes.count * 2)
     }
 
+    @Test("verification accepts CRLF files, with and without blank lines at the end")
+    func verifiesCRLF() throws {
+        for ending in ["\r\n", "\r\n\r\n", ""] {
+            let source = C.text(lines: C.notes(fiveFretNotes), lineBreak: "\r\n") + ending
+            let result = try #require(try convert(source))
+            let count = try converter.verify(converted: Data(result.text.utf8), original: Data(source.utf8))
+            #expect(count == fiveFretNotes.count)
+        }
+    }
+
     @Test("verification catches a changed lane, a missing note and an extra note")
     func catchesCorruption() throws {
         let source = C.text(lines: C.notes(fiveFretNotes))

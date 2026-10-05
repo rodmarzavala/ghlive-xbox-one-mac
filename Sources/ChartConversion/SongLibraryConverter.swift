@@ -90,7 +90,9 @@ public struct SongLibraryConverter: Sendable {
         do {
             entries = try listing(of: directory)
         } catch {
-            report(SongResult(path: relativePath, outcome: .failed("cannot read the folder: \(Self.describe(error))")))
+            report(
+                SongResult(
+                    path: relativePath, outcome: .failed("cannot read the folder: \(error.localizedDescription)")))
             return
         }
         let iniURL = entries.first { !$0.isDirectory && $0.name.lowercased() == Self.iniFileName }?.url
@@ -148,7 +150,7 @@ public struct SongLibraryConverter: Sendable {
                 return .converted(addedTracks: added, notes: notes, songIni: ini)
             }
         } catch {
-            return .failed(Self.describe(error))
+            return .failed(error.localizedDescription)
         }
     }
 
@@ -192,7 +194,7 @@ public struct SongLibraryConverter: Sendable {
                 return .added(value: value)
             }
         } catch {
-            return .failed(Self.describe(error))
+            return .failed(error.localizedDescription)
         }
     }
 
@@ -201,9 +203,5 @@ public struct SongLibraryConverter: Sendable {
         let path = Self.join(folder, url.lastPathComponent)
         if !store.exists(run.backupFolder.appendingPathComponent(path)) { try backUp(url, path: path, run: run) }
         _ = try writeVerified(data, over: url) { try iniPatcher.verify(patched: $0, original: original) }
-    }
-
-    private static func describe(_ error: Error) -> String {
-        (error as? CustomStringConvertible)?.description ?? error.localizedDescription
     }
 }
