@@ -145,9 +145,12 @@ enum SampleStates {
     private static func guitarTest(pressing presses: [Control], analog: [GuitarState]) -> GuitarTestModel {
         let model = GuitarTestModel()
         model.isActive = true
-        let idle = GuitarState(pressedButtons: [], dpad: [], whammy: 0, tilt: restingTilt)
-        for control in presses { model.receive(GuitarSnapshot(state: idle, controls: [control])) }
-        for state in analog { model.receive(GuitarSnapshot(state: state, controls: [])) }
+        var detector = ControlDetector(thresholds: Keymap.default.thresholds)
+        let idle = analogState(whammy: 0, tilt: restingTilt)
+        for control in presses {
+            model.receive(GuitarSnapshot(state: idle, controls: detector.detect(idle).union([control])))
+        }
+        for state in analog { model.receive(GuitarSnapshot(state: state, controls: detector.detect(state))) }
         return model
     }
 
@@ -156,7 +159,7 @@ enum SampleStates {
     }
 
     /// Some frets and buttons verified, the whammy bar pressed but not yet released, tilt not tried.
-    private static var halfwayThroughTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
+    static var halfwayThroughTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
         let pressed: [Control] = [.black1, .black2, .white1, .white2, .strumUp, .strumDown, .heroPower]
         let model = guitarTest(
             pressing: pressed,
@@ -168,7 +171,7 @@ enum SampleStates {
         return (model, snapshot)
     }
 
-    private static var finishedTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
+    static var finishedTest: (model: GuitarTestModel, snapshot: GuitarSnapshot) {
         let model = guitarTest(
             pressing: GuitarTestSession.digitalControls,
             analog: [

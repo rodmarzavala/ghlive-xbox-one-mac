@@ -77,3 +77,16 @@ struct ScreenshotExporterTests {
         }
     }
 }
+
+@MainActor
+struct GuitarTestSampleTests {
+    @Test func theCompleteSampleIsComplete() {
+        #expect(SampleStates.finishedTest.model.session.isComplete)
+    }
+
+    @Test func thePartialSampleIsNot() {
+        let session = SampleStates.halfwayThroughTest.model.session
+        #expect(!session.isComplete)
+        #expect(session.verifiedCount > 0)
+    }
+}
