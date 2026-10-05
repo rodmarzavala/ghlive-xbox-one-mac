@@ -5,22 +5,11 @@ from ghlproto.controls import DEFAULT_TILT_THRESHOLD, Control, Thresholds
 from ghlproto.guitar_state import GuitarState
 from ghlproto.keymap import Keymap
 from ghlproto.output import KeyboardSink
-from tests.test_controls import IDLE
+from tests.fixtures import IDLE, FakeEmitter
 
 KEY_A = 0x10
 KEY_B = 0x20
 KEY_SHARED = 0x30
-
-
-class FakeEmitter:
-    def __init__(self) -> None:
-        self.events: list[tuple[str, int]] = []
-
-    def key_down(self, keycode: int) -> None:
-        self.events.append(("down", keycode))
-
-    def key_up(self, keycode: int) -> None:
-        self.events.append(("up", keycode))
 
 
 def make_sink(emitter: FakeEmitter) -> KeyboardSink:
@@ -73,6 +62,42 @@ class KeyboardSinkTest(unittest.TestCase):
         self.assertEqual(self.emitter.events, [("down", KEY_SHARED)])
         self.sink.apply(IDLE)
         self.assertEqual(self.emitter.events, [("down", KEY_SHARED), ("up", KEY_SHARED)])
+
+    def test_a_key_down_that_failed_midway_is_still_released(self):
+        class FailingOnce(FakeEmitter):
+            def key_down(self, keycode: int) -> None:
+                if not self.events and not self.failed:
+                    self.failed = True
+                    raise OSError("post failed")
+                super().key_down(keycode)
+
+            failed = False
+
+        emitter = FailingOnce()
+        sink = make_sink(emitter)
+        with self.assertRaises(OSError):
+            sink.apply(pressed(black_1=True, white_1=True))
+        sink.release_all()
+        self.assertEqual(emitter.events, [("up", KEY_A)])
+
+    def test_a_key_up_that_failed_is_retried_by_release_all(self):
+        class FailingUp(FakeEmitter):
+            fail = False
+
+            def key_up(self, keycode: int) -> None:
+                if self.fail:
+                    self.fail = False
+                    raise OSError("post failed")
+                super().key_up(keycode)
+
+        emitter = FailingUp()
+        sink = make_sink(emitter)
+        sink.apply(pressed(black_1=True))
+        emitter.fail = True
+        with self.assertRaises(OSError):
+            sink.apply(IDLE)
+        sink.release_all()
+        self.assertEqual(emitter.events, [("down", KEY_A), ("up", KEY_A)])
 
     def test_release_all_lifts_every_pressed_key(self):
         self.sink.apply(pressed(black_1=True, white_1=True))

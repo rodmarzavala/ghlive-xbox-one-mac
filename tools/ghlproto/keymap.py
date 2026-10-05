@@ -25,11 +25,10 @@ KEY_CODES: dict[str, int] = {
 
 KEY_NAMES: dict[int, str] = {code: name for name, code in KEY_CODES.items()}
 
-THRESHOLD_TYPES: dict[str, tuple[type, ...]] = {
-    "whammy": (int, float),
-    "tilt": (int,),
-    "tilt_hysteresis": (int,),
-}
+BYTE_MAX = 0xFF
+KNOWN_SECTIONS = {KEYS_SECTION, THRESHOLDS_SECTION}
+FLOAT_THRESHOLDS = {"whammy", "whammy_hysteresis"}
+INTEGER_THRESHOLDS = {"tilt", "tilt_hysteresis"}
 
 
 class KeymapError(ValueError):
@@ -42,28 +41,57 @@ class Keymap:
     thresholds: Thresholds
 
 
+def section_table(document: dict[str, object], name: str) -> dict[str, object]:
+    table = document.get(name, {})
+    if not isinstance(table, dict):
+        raise KeymapError(f"[{name}] must be a table")
+    return table
+
+
 def parse_bindings(table: dict[str, object]) -> dict[Control, int]:
+    if not table:
+        raise KeymapError(f"[{KEYS_SECTION}] is missing or empty")
     bindings: dict[Control, int] = {}
     for control_name, key_name in table.items():
         try:
             control = Control(control_name)
         except ValueError:
             raise KeymapError(f"unknown control '{control_name}' in [{KEYS_SECTION}]") from None
-        if not isinstance(key_name, str) or key_name.lower() not in KEY_CODES:
+        if not isinstance(key_name, str):
+            raise KeymapError(f"key for control '{control_name}' must be a string, got {key_name!r}")
+        if key_name.lower() not in KEY_CODES:
             raise KeymapError(f"unknown key '{key_name}' for control '{control_name}'")
         bindings[control] = KEY_CODES[key_name.lower()]
     return bindings
 
 
+def check_threshold_type(name: str, value: object) -> None:
+    is_number = isinstance(value, int | float) and not isinstance(value, bool)
+    if name in INTEGER_THRESHOLDS and not (is_number and isinstance(value, int)):
+        raise KeymapError(f"threshold '{name}' must be an integer, got {value!r}")
+    if name in FLOAT_THRESHOLDS and not is_number:
+        raise KeymapError(f"threshold '{name}' must be a number, got {value!r}")
+
+
+def check_threshold_ranges(thresholds: Thresholds) -> None:
+    if not 0 < thresholds.whammy <= 1:
+        raise KeymapError("threshold 'whammy' must be above 0 and at most 1")
+    if not 0 <= thresholds.whammy_hysteresis < thresholds.whammy:
+        raise KeymapError("threshold 'whammy_hysteresis' must be at least 0 and below 'whammy'")
+    if not 0 <= thresholds.tilt <= BYTE_MAX:
+        raise KeymapError(f"threshold 'tilt' must be between 0 and {BYTE_MAX}")
+    if not 0 <= thresholds.tilt_hysteresis < thresholds.tilt:
+        raise KeymapError("threshold 'tilt_hysteresis' must be at least 0 and below 'tilt'")
+
+
 def parse_thresholds(table: dict[str, object]) -> Thresholds:
-    values: dict[str, object] = {}
     for name, value in table.items():
-        if name not in THRESHOLD_TYPES:
+        if name not in FLOAT_THRESHOLDS | INTEGER_THRESHOLDS:
             raise KeymapError(f"unknown threshold '{name}' in [{THRESHOLDS_SECTION}]")
-        if isinstance(value, bool) or not isinstance(value, THRESHOLD_TYPES[name]):
-            raise KeymapError(f"threshold '{name}' must be a number, got {value!r}")
-        values[name] = value
-    return replace(Thresholds(), **values)
+        check_threshold_type(name, value)
+    thresholds = replace(Thresholds(), **table)
+    check_threshold_ranges(thresholds)
+    return thresholds
 
 
 def parse_keymap(text: str) -> Keymap:
@@ -71,9 +99,12 @@ def parse_keymap(text: str) -> Keymap:
         document = tomllib.loads(text)
     except tomllib.TOMLDecodeError as error:
         raise KeymapError(f"invalid TOML: {error}") from error
+    unknown = sorted(set(document) - KNOWN_SECTIONS)
+    if unknown:
+        raise KeymapError(f"unknown section '{unknown[0]}'")
     return Keymap(
-        parse_bindings(document.get(KEYS_SECTION, {})),
-        parse_thresholds(document.get(THRESHOLDS_SECTION, {})),
+        parse_bindings(section_table(document, KEYS_SECTION)),
+        parse_thresholds(section_table(document, THRESHOLDS_SECTION)),
     )
 
 

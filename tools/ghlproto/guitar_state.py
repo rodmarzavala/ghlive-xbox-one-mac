@@ -85,8 +85,8 @@ def normalise_whammy(raw: int) -> float:
 def parse_guitar_report(payload: bytes) -> GuitarState:
     if len(payload) != GUITAR_REPORT_LENGTH:
         raise GuitarReportError(f"guitar report must be {GUITAR_REPORT_LENGTH} bytes, got {len(payload)}")
-    frets = Fret(payload[FRET_OFFSET] & sum(Fret))
-    buttons = Button(payload[BUTTON_OFFSET] & sum(Button))
+    frets = Fret(payload[FRET_OFFSET])
+    buttons = Button(payload[BUTTON_OFFSET])
     return GuitarState(
         black_1=Fret.BLACK_1 in frets,
         black_2=Fret.BLACK_2 in frets,

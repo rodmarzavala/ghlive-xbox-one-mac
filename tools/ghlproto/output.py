@@ -34,8 +34,10 @@ class KeyboardSink:
         self._move_to(frozenset())
 
     def _move_to(self, target: frozenset[int]) -> None:
+        # Tracking is updated around each post so a failed post never leaves a key down that release_all forgets.
         for keycode in sorted(self._pressed - target):
             self._emitter.key_up(keycode)
+            self._pressed -= {keycode}
         for keycode in sorted(target - self._pressed):
+            self._pressed |= {keycode}
             self._emitter.key_down(keycode)
-        self._pressed = target

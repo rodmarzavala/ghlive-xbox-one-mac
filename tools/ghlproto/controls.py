@@ -6,7 +6,8 @@ from enum import StrEnum
 from ghlproto.guitar_state import DpadDirection, GuitarState
 
 DEFAULT_WHAMMY_THRESHOLD = 0.5
-# Measured on hardware: tilt rests near 110 (+-3 jitter) and reaches about 171 when raised.
+DEFAULT_WHAMMY_HYSTERESIS = 0.1
+# Measured on hardware: tilt idles between 95 and 115 and reaches about 171 when raised.
 DEFAULT_TILT_THRESHOLD = 150
 DEFAULT_TILT_HYSTERESIS = 10
 
@@ -31,19 +32,20 @@ class Control(StrEnum):
     TILT = "tilt"
 
 
-DIGITAL_FIELD_CONTROLS: dict[str, Control] = {
-    "black_1": Control.BLACK_1,
-    "black_2": Control.BLACK_2,
-    "black_3": Control.BLACK_3,
-    "white_1": Control.WHITE_1,
-    "white_2": Control.WHITE_2,
-    "white_3": Control.WHITE_3,
-    "strum_up": Control.STRUM_UP,
-    "strum_down": Control.STRUM_DOWN,
-    "hero_power": Control.HERO_POWER,
-    "pause": Control.PAUSE,
-    "ghtv": Control.GHTV,
-}
+# These controls are GuitarState bool fields of the same name.
+DIGITAL_CONTROLS: tuple[Control, ...] = (
+    Control.BLACK_1,
+    Control.BLACK_2,
+    Control.BLACK_3,
+    Control.WHITE_1,
+    Control.WHITE_2,
+    Control.WHITE_3,
+    Control.STRUM_UP,
+    Control.STRUM_DOWN,
+    Control.HERO_POWER,
+    Control.PAUSE,
+    Control.GHTV,
+)
 
 DPAD_CONTROLS: dict[DpadDirection, Control] = {
     DpadDirection.UP: Control.DPAD_UP,
@@ -56,30 +58,28 @@ DPAD_CONTROLS: dict[DpadDirection, Control] = {
 @dataclass(frozen=True)
 class Thresholds:
     whammy: float = DEFAULT_WHAMMY_THRESHOLD
+    whammy_hysteresis: float = DEFAULT_WHAMMY_HYSTERESIS
     tilt: int = DEFAULT_TILT_THRESHOLD
     tilt_hysteresis: int = DEFAULT_TILT_HYSTERESIS
 
 
-class TiltDetector:
-    """Turns the analog tilt into a flag that engages at the threshold and releases `hysteresis` below it."""
+class HysteresisDetector:
+    """Digitises an analog value: engages at `engage_at` and releases once it drops `band` below it."""
 
-    def __init__(self, thresholds: Thresholds) -> None:
-        self._engage_at = thresholds.tilt
-        self._release_below = thresholds.tilt - thresholds.tilt_hysteresis
+    def __init__(self, engage_at: float, band: float) -> None:
+        self._engage_at = engage_at
+        self._release_below = engage_at - band
         self._active = False
 
-    def update(self, tilt: int) -> bool:
-        if self._active:
-            self._active = tilt >= self._release_below
-        else:
-            self._active = tilt >= self._engage_at
+    def update(self, value: float) -> bool:
+        self._active = value >= (self._release_below if self._active else self._engage_at)
         return self._active
 
 
-def active_controls(state: GuitarState, thresholds: Thresholds, tilt_active: bool) -> frozenset[Control]:
-    active = {control for field, control in DIGITAL_FIELD_CONTROLS.items() if getattr(state, field)}
+def active_controls(state: GuitarState, whammy_active: bool, tilt_active: bool) -> frozenset[Control]:
+    active = {control for control in DIGITAL_CONTROLS if getattr(state, control.value)}
     active.update(DPAD_CONTROLS[direction] for direction in state.dpad)
-    if state.whammy >= thresholds.whammy:
+    if whammy_active:
         active.add(Control.WHAMMY)
     if tilt_active:
         active.add(Control.TILT)
@@ -88,8 +88,8 @@ def active_controls(state: GuitarState, thresholds: Thresholds, tilt_active: boo
 
 class ControlDetector:
     def __init__(self, thresholds: Thresholds) -> None:
-        self._thresholds = thresholds
-        self._tilt = TiltDetector(thresholds)
+        self._whammy = HysteresisDetector(thresholds.whammy, thresholds.whammy_hysteresis)
+        self._tilt = HysteresisDetector(thresholds.tilt, thresholds.tilt_hysteresis)
 
     def detect(self, state: GuitarState) -> frozenset[Control]:
-        return active_controls(state, self._thresholds, self._tilt.update(state.tilt))
+        return active_controls(state, self._whammy.update(state.whammy), self._tilt.update(state.tilt))

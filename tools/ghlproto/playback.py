@@ -10,8 +10,8 @@ from ghlproto.keymap import KEY_NAMES
 from ghlproto.output import OutputSink
 from ghlproto.runner import PacketHandler
 
-# Tilt jitters by about +-3 at rest; report a raw tilt change only when it is clearly more than that.
-TILT_REPORT_STEP = 10
+# Idle tilt wanders across a 20-wide range (95-115); report a raw tilt change only when it exceeds that.
+TILT_REPORT_STEP = 25
 NO_CONTROLS_LABEL = "none"
 
 
@@ -53,7 +53,7 @@ class ReportingSink:
         self._detector = ControlDetector(thresholds)
         self._out = out
         self._last_controls: frozenset[Control] | None = None
-        self._last_reported_tilt: int | None = None
+        self._last_reported_tilt = 0
 
     def apply(self, state: GuitarState) -> None:
         self._inner.apply(state)
@@ -65,7 +65,7 @@ class ReportingSink:
         self._inner.release_all()
 
     def _tilt_moved(self, tilt: int) -> bool:
-        return self._last_reported_tilt is not None and abs(tilt - self._last_reported_tilt) >= TILT_REPORT_STEP
+        return abs(tilt - self._last_reported_tilt) >= TILT_REPORT_STEP
 
     def _report(self, controls: frozenset[Control], tilt: int) -> None:
         names = ", ".join(sorted(controls)) or NO_CONTROLS_LABEL

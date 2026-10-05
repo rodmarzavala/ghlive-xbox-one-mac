@@ -4,7 +4,6 @@ from dataclasses import replace
 
 from ghlproto.controls import Thresholds
 from ghlproto.gip import GipCommand, GipPacket
-from ghlproto.guitar_state import GuitarState
 from ghlproto.keymap import KEY_CODES
 from ghlproto.playback import (
     TILT_REPORT_STEP,
@@ -12,20 +11,7 @@ from ghlproto.playback import (
     ReportingSink,
     guitar_packet_handler,
 )
-from tests.test_controls import IDLE
-from tests.test_guitar_state import IDLE_PAYLOAD, payload_with
-
-
-class RecordingSink:
-    def __init__(self) -> None:
-        self.states: list[GuitarState] = []
-        self.released = 0
-
-    def apply(self, state: GuitarState) -> None:
-        self.states.append(state)
-
-    def release_all(self) -> None:
-        self.released += 1
+from tests.fixtures import IDLE, IDLE_PAYLOAD, RecordingSink, payload_with
 
 
 def packet(command: int, payload: bytes) -> GipPacket:

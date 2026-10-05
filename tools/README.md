@@ -40,9 +40,9 @@ Turns the guitar into keyboard events.
 .venv/bin/python play.py                      # presses real keys
 ```
 
-Posting keys needs the **Accessibility** permission: System Settings > Privacy & Security > Accessibility, enable the terminal app you run it from, then restart that terminal. Without it `play.py` prints this hint and exits with code 2.
+Posting keys needs the **Accessibility** permission. macOS does not prompt for it: add the terminal app you run it from in System Settings > Privacy & Security > Accessibility (+ button), then restart that terminal. Without it `play.py` prints this hint and exits with code 2.
 
-Every key is released on Ctrl-C and when the dongle is unplugged.
+Every key is released on Ctrl-C, SIGTERM, SIGHUP (terminal closed) and when the dongle is unplugged.
 
 Options: `--keymap PATH` (default `keymaps/default.toml`), `--verbose`, `--dry-run`.
 
@@ -52,14 +52,14 @@ Copy `keymaps/default.toml`, edit it and pass it with `--keymap`. `[keys]` maps 
 
 ### Calibrating tilt
 
-Tilt is an analog byte (about 110 at rest). `--verbose` prints the active controls whenever they change, and every time the raw tilt moves by 10 or more:
+Tilt is an analog byte (95-115 at rest). `--verbose` prints the active controls whenever they change, and every time the raw tilt moves by 25 or more:
 
 ```
 tilt | tilt=171
 none | tilt=108
 ```
 
-Raise the guitar the way you play, note the values, and set `[thresholds] tilt` in your keymap below the raised value and well above rest. Tilt releases once it drops below `tilt - tilt_hysteresis` (default 10), so jitter at the edge does not chatter. `whammy` (0.0 to 1.0) works the same way.
+Raise the guitar the way you play, note the values, and set `[thresholds] tilt` in your keymap below the raised value and well above rest. Tilt releases once it drops below `tilt - tilt_hysteresis` (default 10), so jitter at the edge does not chatter. `whammy` (0.0 to 1.0, with `whammy_hysteresis`, default 0.1) works the same way. Out-of-range values are rejected with the threshold named.
 
 ## Lint and tests
 

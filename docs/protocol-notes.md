@@ -39,7 +39,7 @@ Observed: the dongle answers with STATUS (flags `0x20`, payload `83`) and an ACK
 
 The guitar then streams `0x21` (27 bytes, about every 12 ms). Idle payload:
 `00 00 0f 80 80 80 80 00 00 00 00 00 00 00 00 00 00 00 00 70 00 80 01 00 02 00 02`.
-Byte 19 (tilt) jitters by about +-3 at rest. This matches PlasticBand's layout.
+Byte 19 (tilt) wanders between about 95 and 115 at rest. This matches PlasticBand's layout.
 
 STATUS (`0x03`, payload `83`) arrives about every 20 s. A single USB IN transfer may bundle several GIP messages back to back (seen: STATUS followed by a `0x21` report), so a transfer must be decoded message by message.
 
@@ -52,4 +52,4 @@ Chunked GIP packets (flag `0x80`) are not supported: they are logged and not ack
 - Byte 2: d-pad as a hat value (0 = up, clockwise to 7, 15 = centered; odd values are diagonals).
 - Byte 4: strum bar: `0x80` idle, `0x00` up, `0xFF` down.
 - Byte 6: whammy, `0x80` released → `0xFF` fully pressed, smooth analog.
-- Byte 19: tilt, analog: about 110 at rest (+-3 jitter), 171 and 67 at the extremes. The "tilt extreme" flags documented by PlasticBand (byte 5, bytes 21–22) never triggered on this guitar, so tilt is derived from byte 19 with a threshold.
+- Byte 19: tilt, analog: 95-115 at rest, 171 and 67 at the extremes. The "tilt extreme" flags documented by PlasticBand (byte 5, bytes 21–22) never triggered on this guitar, so tilt is derived from byte 19 with a threshold.

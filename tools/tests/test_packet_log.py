@@ -1,8 +1,9 @@
 import io
 import unittest
+from unittest import mock
 
 from ghlproto.gip import GipCommand, GipFlag, GipPacket
-from ghlproto.packet_log import Direction, PacketLogger, format_packet, format_undecodable
+from ghlproto.packet_log import Direction, NullPacketLogger, PacketLogger, format_packet, format_undecodable
 
 UNKNOWN_COMMAND = 0x3F
 GUITAR_INPUT = GipPacket(GipCommand.GHL_GUITAR_INPUT, 0, 1, bytes(27))
@@ -76,6 +77,17 @@ class PacketLoggerTest(unittest.TestCase):
         logger = PacketLogger(False, clock=lambda: next(times), out=self.out)
         logger.note("hello")
         self.assertEqual(self.lines(), ["   1.500 !! hello"])
+
+
+class NullPacketLoggerTest(unittest.TestCase):
+    def test_every_logging_call_is_silent(self):
+        logger = NullPacketLogger()
+        with mock.patch("builtins.print") as printed:
+            logger.sent(GUITAR_INPUT)
+            logger.received(GUITAR_INPUT)
+            logger.undecodable(b"\x00", "bad")
+            logger.note("hello")
+        printed.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -19,9 +19,10 @@ dpad_down = "down"
 dpad_left = "left"
 dpad_right = "right"
 
-# Optional. Whammy is 0.0 (released) to 1.0 (fully pressed); tilt is the raw byte (about 110 at rest).
-# Tilt engages at `tilt` and releases once it drops below `tilt - tilt_hysteresis`.
+# Optional. Whammy is 0.0 (released) to 1.0 (fully pressed); tilt is the raw byte (95-115 at rest).
+# Each engages at its threshold and releases once it drops below `threshold - hysteresis`.
 [thresholds]
 whammy = 0.5
+whammy_hysteresis = 0.1
 tilt = 150
 tilt_hysteresis = 10

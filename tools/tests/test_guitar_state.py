@@ -7,17 +7,7 @@ from ghlproto.guitar_state import (
     GuitarState,
     parse_guitar_report,
 )
-
-IDLE_PAYLOAD = bytes.fromhex("00000f808080800000000000000000000000006e00800100020002")
-IDLE_TILT = 0x6E
-
-
-def payload_with(**changes: int) -> bytes:
-    """Idle payload with byte overrides given as b<offset>=value."""
-    data = bytearray(IDLE_PAYLOAD)
-    for name, value in changes.items():
-        data[int(name[1:])] = value
-    return bytes(data)
+from tests.fixtures import IDLE_PAYLOAD, IDLE_TILT, payload_with
 
 
 def pressed_flags(state: GuitarState) -> set[str]:
@@ -45,6 +35,9 @@ class ParseGuitarReportTest(unittest.TestCase):
             with self.subTest(name):
                 self.assertEqual(pressed_flags(parse_guitar_report(payload_with(b0=bit))), {name})
 
+    def test_unknown_bits_are_ignored(self):
+        self.assertEqual(pressed_flags(parse_guitar_report(payload_with(b0=0xC0, b1=0xF8))), set())
+
     def test_each_button_bit(self):
         cases = {"hero_power": 0x01, "pause": 0x02, "ghtv": 0x04}
         for name, bit in cases.items():
@@ -66,7 +59,7 @@ class ParseGuitarReportTest(unittest.TestCase):
             0x05: {down, left},
             0x06: {left},
             0x07: {left, up},
-            0x0F: set(),
+            **{hat: set() for hat in (0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F)},
         }
         for hat, expected in cases.items():
             with self.subTest(hat=hat):

@@ -34,11 +34,9 @@ Protocol details are in [docs/protocol-notes.md](docs/protocol-notes.md).
    .venv/bin/pip install -r requirements.txt
    .venv/bin/python play.py
    ```
-   Grant your terminal app the Accessibility permission when asked (System Settings > Privacy & Security > Accessibility).
-2. In Clone Hero open the controller settings (Settings > Controls), choose the keyboard as the device and bind each guitar control by pressing it on the guitar when the game asks for an input.
+   macOS does not prompt for the Accessibility permission: add your terminal app manually in System Settings > Privacy & Security > Accessibility.
+2. Bind each guitar control to its key in Clone Hero's controller settings.
 3. The default keymap is in [tools/keymaps/default.toml](tools/keymaps/default.toml). Strum maps to the arrow keys so the menus can be navigated with the guitar.
-
-The exact Clone Hero menu names may differ between versions.
 
 ### Limitations (v1)
 
