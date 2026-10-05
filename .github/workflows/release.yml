@@ -11,22 +11,26 @@ on:
     tags: ["v*"]
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.version || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release:
     name: Test, build, attest and publish
+    # Manual releases come from main only; tag pushes are gated by who can push tags.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: macos-15
     permissions:
       contents: write
       id-token: write
       attestations: write
     env:
-      GH_TOKEN: ${{ github.token }}
       INPUT_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          persist-credentials: false
 
       - name: Resolve and check the version
         id: version
@@ -63,10 +67,19 @@ jobs:
 
       - name: Publish the GitHub Release
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.version.outputs.version }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           tag="v${VERSION}"
+          # A tag that already exists must point at the commit that was just built and attested.
+          if tag_commit="$(git rev-parse --verify --quiet "refs/tags/${tag}^{commit}")"; then
+            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag ${tag} points at ${tag_commit}, not at the built commit ${GITHUB_SHA}. Refusing to publish."
+              exit 1
+            fi
+          fi
           scripts/release-notes.sh "$VERSION" > release-notes.md
           assets=(dist/*.zip dist/*.zip.sha256 dist/*.tar.gz dist/*.tar.gz.sha256)
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -74,11 +87,9 @@ jobs:
             gh release edit "$tag" --notes-file release-notes.md \
               --prerelease="$PRERELEASE"
           else
-            flags=()
-            if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
             gh release create "$tag" "${assets[@]}" \
               --title "GHLive ${VERSION}" \
               --notes-file release-notes.md \
               --target "$GITHUB_SHA" \
-              "${flags[@]}"
+              --prerelease="$PRERELEASE"
           fi

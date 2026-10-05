@@ -14,6 +14,17 @@ APP="$DIST/GHLive.app"
 APP_ZIP="GHLive-${VERSION}-macos-universal.zip"
 CLI_TARBALL="ghlive-${VERSION}-macos-universal.tar.gz"
 EXPECTED_ARCHS="x86_64 arm64"
+# Apple wants a numeric CFBundleShortVersionString, so a prerelease keeps its suffix only in CFBundleVersion.
+SHORT_VERSION="${VERSION%%-*}"
+
+verify_universal() {
+    local binary="$1" archs arch
+    archs="$(lipo -archs "$binary")"
+    echo "$(basename "$binary") architectures: ${archs}"
+    for arch in $EXPECTED_ARCHS; do
+        [[ " $archs " == *" $arch "* ]] || { echo "error: $(basename "$binary") lacks ${arch}" >&2; exit 1; }
+    done
+}
 
 echo "==> Building GHLive ${VERSION} (universal)"
 swift build -c release --arch arm64 --arch x86_64
@@ -42,8 +53,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleDisplayName</key><string>GHLive</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>CFBundleShortVersionString</key><string>${VERSION%%-*}</string>
-    <key>CFBundleVersion</key><string>${VERSION%%-*}</string>
+    <key>CFBundleShortVersionString</key><string>${SHORT_VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>LSMinimumSystemVersion</key><string>${MIN_MACOS}</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
@@ -56,11 +67,7 @@ plutil -lint "$APP/Contents/Info.plist"
 echo "==> Signing (ad-hoc)"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
-archs="$(lipo -archs "$APP/Contents/MacOS/GHLiveApp")"
-echo "GHLiveApp architectures: ${archs}"
-for arch in $EXPECTED_ARCHS; do
-    [[ " $archs " == *" $arch "* ]] || { echo "error: missing architecture ${arch}" >&2; exit 1; }
-done
+verify_universal "$APP/Contents/MacOS/GHLiveApp"
 
 echo "==> Packing"
 ditto -c -k --keepParent "$APP" "$DIST/$APP_ZIP"
@@ -69,8 +76,7 @@ CLI_STAGE="$DIST/cli"
 mkdir -p "$CLI_STAGE"
 cp "$BIN_DIR/ghlive" "$CLI_STAGE/ghlive"
 codesign --force --sign - "$CLI_STAGE/ghlive"
-cli_archs="$(lipo -archs "$CLI_STAGE/ghlive")"
-echo "ghlive architectures: ${cli_archs}"
+verify_universal "$CLI_STAGE/ghlive"
 tar -czf "$DIST/$CLI_TARBALL" -C "$CLI_STAGE" ghlive
 rm -rf "$CLI_STAGE"
 
