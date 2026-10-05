@@ -19,6 +19,10 @@ struct SurfaceStyleTests {
         #expect(SurfaceStyle.resolve(osMajorVersion: major, sdkHasGlass: false) == .classic)
     }
 
+    @Test func stackedBannersStayApartInAGlassGroup() {
+        #expect(Metrics.stackedBannerSpacing > Metrics.glassGroupSpacing)
+    }
+
     @Test func glassStartsAtMacOS26() {
         #expect(SurfaceStyle.firstGlassMajorVersion == 26)
     }

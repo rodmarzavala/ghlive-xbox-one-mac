@@ -22,6 +22,8 @@ enum Metrics {
     static let bannerPadding: CGFloat = 10
     static let glassTintOpacity = 0.22
     static let glassGroupSpacing: CGFloat = 4
+    /// Wider than `glassGroupSpacing`, or stacked glass banners would merge into one blob.
+    static let stackedBannerSpacing: CGFloat = 8
 }
 
 /// Which look the surfaces (cards, banners, buttons) take. `current` is the one place that decides.

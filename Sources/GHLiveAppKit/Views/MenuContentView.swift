@@ -71,7 +71,7 @@ public struct MenuContentView: View {
                     isSelected: menu.launchesAtLogin
                 ) { actions.setLaunchAtLogin(!menu.launchesAtLogin) }
                 GlassGroup {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: Metrics.stackedBannerSpacing) {
                         if menu.launchAtLoginNeedsApproval { loginItemApproval }
                         if let problem = menu.launchAtLoginProblem { warning(problem) }
                     }
