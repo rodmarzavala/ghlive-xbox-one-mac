@@ -23,6 +23,32 @@ struct LaunchOptionsTests {
     }
 }
 
+@MainActor
+struct InitialWindowTests {
+    private let dryRun = [AppModel.dryRunVariable: "1"]
+
+    @Test func opensTheNamedWindowInDryRun() {
+        for window in AppWindow.allCases {
+            let opened = LaunchOptions.initialWindow(
+                arguments: ["--open-window", window.rawValue], environment: dryRun)
+            #expect(opened == window)
+        }
+    }
+
+    @Test func isIgnoredOutsideDryRun() {
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window", "settings"], environment: [:]) == nil)
+        #expect(
+            LaunchOptions.initialWindow(
+                arguments: ["--open-window", "settings"], environment: [AppModel.dryRunVariable: "0"]) == nil)
+    }
+
+    @Test func ignoresMissingOrUnknownValues() {
+        #expect(LaunchOptions.initialWindow(arguments: [], environment: dryRun) == nil)
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window"], environment: dryRun) == nil)
+        #expect(LaunchOptions.initialWindow(arguments: ["--open-window", "about"], environment: dryRun) == nil)
+    }
+}
+
 struct VersionTests {
     @Test func versionFileMatchesTheCode() throws {
         let root = URL(fileURLWithPath: #filePath)
@@ -42,11 +68,25 @@ struct ScreenshotExporterTests {
         #expect(files.count == SampleStates.screens().count * 2)
         #expect(files.contains { $0.lastPathComponent == "monitor-active-dark.png" })
         #expect(files.contains { $0.lastPathComponent == "settings-light.png" })
+        #expect(files.contains { $0.lastPathComponent == "settings-preset-five-fret-light.png" })
         let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
         for file in files {
             let data = try Data(contentsOf: file)
             #expect(data.count > 1000)
             #expect([UInt8](data.prefix(4)) == pngSignature)
         }
+    }
+}
+
+@MainActor
+struct GuitarTestSampleTests {
+    @Test func theCompleteSampleIsComplete() {
+        #expect(SampleStates.finishedTest.model.session.isComplete)
+    }
+
+    @Test func thePartialSampleIsNot() {
+        let session = SampleStates.halfwayThroughTest.model.session
+        #expect(!session.isComplete)
+        #expect(session.verifiedCount > 0)
     }
 }

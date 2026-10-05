@@ -8,31 +8,48 @@ public struct SettingsView: View {
 
     @ObservedObject private var model: SettingsModel
     private let capturesKeys: Bool
+    private let limitsHeight: Bool
 
     private static let leftColumnGroupCount = 3
     private static let sliderStep = 1.0
     private static let whammyStep = 0.05
+    /// The footer row and the spacing above it: the one part that must never scroll away.
+    private static let footerHeight: CGFloat = 90
+    private static let customPresetCaption = "You changed some keys. Pick a preset to start from its keys again."
 
-    /// `capturesKeys` is off for screenshots: the AppKit key monitor cannot be rendered.
-    public init(model: SettingsModel, capturesKeys: Bool = true) {
+    /// `capturesKeys` and `limitsHeight` are off for screenshots: the AppKit key monitor and scroll view cannot
+    /// be rendered.
+    public init(model: SettingsModel, capturesKeys: Bool = true, limitsHeight: Bool = true) {
         self.model = model
         self.capturesKeys = capturesKeys
+        self.limitsHeight = limitsHeight
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
-            if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
-            HStack(alignment: .top, spacing: 20) {
-                column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+            ScrollsWithinScreen(isEnabled: limitsHeight, reservedHeight: Self.footerHeight) {
                 VStack(alignment: .leading, spacing: 14) {
-                    ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) { groupCard($0) }
-                    thresholdsCard
+                    header
+                    GlassGroup {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if case .unreadableKeymap(let detail) = model.message { unreadableKeymapCard(detail) }
+                            presetCard
+                            HStack(alignment: .top, spacing: 20) {
+                                column(Array(ControlGroup.all.prefix(Self.leftColumnGroupCount)))
+                                VStack(alignment: .leading, spacing: 14) {
+                                    ForEach(Array(ControlGroup.all.dropFirst(Self.leftColumnGroupCount))) {
+                                        groupCard($0)
+                                    }
+                                    thresholdsCard
+                                }
+                            }
+                        }
+                    }
                 }
             }
             footer
         }
-        .padding(20)
+        .padding(ScreenFit.contentPadding)
         .frame(width: Self.width)
         .background {
             if capturesKeys {
@@ -53,6 +70,40 @@ public struct SettingsView: View {
         }
     }
 
+    private var presetCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("PRESET").font(.caption.weight(.semibold)).foregroundColor(.secondary).padding(.leading, 4)
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(KeymapPreset.allCases, id: \.self) { preset in
+                            Button(preset.displayName) { model.requestPreset(preset) }
+                                .ghButtonStyle(prominent: model.currentPreset == preset)
+                                .accessibilityAddTraits(model.currentPreset == preset ? .isSelected : [])
+                        }
+                        Spacer()
+                        Text(model.currentPreset.map { "Using: \($0.displayName)" } ?? "Custom keys")
+                            .font(.callout).foregroundColor(.secondary)
+                    }
+                    Text(model.currentPreset?.summary ?? Self.customPresetCaption)
+                        .font(.caption).foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .alert(
+            model.pendingPreset.map { "Switch to the \($0.shortName) preset?" } ?? "",
+            isPresented: Binding(
+                get: { model.pendingPreset != nil },
+                set: { if !$0 { model.cancelPreset() } })
+        ) {
+            Button("Switch", role: .destructive, action: model.confirmPreset)
+            Button("Cancel", role: .cancel, action: model.cancelPreset)
+        } message: {
+            Text("Your current keys will be replaced. Your sensitivity settings are kept.")
+        }
+    }
+
     private func column(_ groups: [ControlGroup]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(groups) { groupCard($0) }
@@ -70,7 +121,7 @@ public struct SettingsView: View {
     }
 
     private func unreadableKeymapCard(_ detail: String) -> some View {
-        Card(border: .red) {
+        Card(emphasis: .red) {
             VStack(alignment: .leading, spacing: 6) {
                 NoticeLabel(
                     text: SettingsCopy.unreadableKeymapHeadline, symbol: "xmark.octagon.fill", color: .red
@@ -82,7 +133,7 @@ public struct SettingsView: View {
                     .font(.caption).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Open keymap folder", action: model.onOpenKeymapFolder)
-                    .buttonStyle(SecondaryButtonStyle())
+                    .ghButtonStyle(prominent: false)
             }
         }
     }
@@ -162,7 +213,7 @@ public struct SettingsView: View {
         HStack(alignment: .top, spacing: 16) {
             messageView.frame(maxWidth: .infinity, alignment: .leading)
             Button("Restore defaults", action: model.requestRestoreDefaults)
-                .buttonStyle(SecondaryButtonStyle())
+                .ghButtonStyle(prominent: false)
         }
     }
 

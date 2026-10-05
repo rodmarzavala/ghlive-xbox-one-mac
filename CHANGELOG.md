@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- A "5-fret (classic charts)" keymap preset next to the default 6-fret one, so the guitar can play classic five-lane charts with keys 1-5. Settings shows which preset is active (or "Custom keys"), and `ghlive keymap --print-preset five-fret|six-fret` prints either as JSON.
+- "Test my guitar" in the Input Monitor: a checklist of every fret, strum direction, button, d-pad direction, the whammy bar and tilt, with the range seen for the analog ones, a progress line, "Start over", and a message when everything works.
+
+### Changed
+
+- On macOS 26 and later the menu, Settings and Input Monitor use Liquid Glass; older systems keep the current look.
+- Settings and the Input Monitor scroll instead of growing past the screen, and keep their footer in view.
+
 ## [0.1.0-beta.1] - 2026-10-05
 
 First public beta.

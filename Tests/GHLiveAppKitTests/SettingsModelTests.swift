@@ -102,6 +102,70 @@ struct SettingsModelTests {
         #expect(store.saved.last == .default)
     }
 
+    @Test func theCurrentPresetFollowsTheKeys() {
+        let (model, _) = make()
+        #expect(model.currentPreset == .sixFret)
+        model.toggleRecording(.black1)
+        model.handleKeyDown(keyCode: Self.keyA)
+        #expect(model.currentPreset == nil)
+    }
+
+    @Test func applyingAPresetNeedsConfirmation() {
+        let (model, store) = make()
+        model.requestPreset(.fiveFret)
+        #expect(model.pendingPreset == .fiveFret)
+        #expect(model.bindings == Keymap.default.bindings)
+        #expect(store.saved.isEmpty)
+    }
+
+    @Test func confirmingAPresetStopsRecording() {
+        let (model, _) = make()
+        model.toggleRecording(.black1)
+        model.requestPreset(.fiveFret)
+        model.confirmPreset()
+        #expect(model.recordingControl == nil)
+    }
+
+    @Test func cancellingThePresetKeepsTheKeys() {
+        let (model, store) = make()
+        model.requestPreset(.fiveFret)
+        model.cancelPreset()
+        #expect(model.pendingPreset == nil)
+        #expect(model.bindings == Keymap.default.bindings)
+        #expect(store.saved.isEmpty)
+    }
+
+    @Test func confirmingAPresetSavesItsKeysAndKeepsTheThresholds() {
+        let (model, store) = make()
+        var notified: [Keymap] = []
+        model.onSaved = { notified.append($0) }
+        model.tilt = 40
+        model.whammy = 0.9
+        model.requestPreset(.fiveFret)
+        model.confirmPreset()
+        #expect(model.pendingPreset == nil)
+        #expect(model.bindings == KeymapPreset.fiveFret.keymap.bindings)
+        #expect(model.currentPreset == .fiveFret)
+        let saved = store.saved.last
+        #expect(saved?.bindings == KeymapPreset.fiveFret.keymap.bindings)
+        #expect(saved?.thresholds.tilt == 40)
+        #expect(saved?.thresholds.whammy == 0.9)
+        #expect(notified == store.saved)
+    }
+
+    @Test func confirmingWithoutARequestChangesNothing() {
+        let (model, store) = make()
+        model.confirmPreset()
+        #expect(model.bindings == Keymap.default.bindings)
+        #expect(store.saved.isEmpty)
+    }
+
+    @Test func requestingThePresetInUseDoesNotAsk() {
+        let (model, _) = make()
+        model.requestPreset(.sixFret)
+        #expect(model.pendingPreset == nil)
+    }
+
     @Test func sliderValuesAreSavedAsThresholds() {
         let (model, store) = make()
         model.tilt = 133

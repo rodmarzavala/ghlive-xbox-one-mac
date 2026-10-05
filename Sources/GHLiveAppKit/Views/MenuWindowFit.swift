@@ -19,7 +19,7 @@ enum MenuWindowFit {
     }
 }
 
-private struct ContentHeightKey: PreferenceKey {
+struct ContentHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     // Last-wins would keep the default 0 from sibling views; the tallest report is the content's.

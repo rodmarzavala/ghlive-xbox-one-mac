@@ -27,6 +27,58 @@ extension Keymap {
     ]
 }
 
+// MARK: - Presets
+
+/// A ready-made set of keys. Applying one replaces the keys and keeps the player's thresholds.
+public enum KeymapPreset: String, CaseIterable, Sendable {
+    case sixFret = "six-fret"
+    case fiveFret = "five-fret"
+
+    public var shortName: String {
+        switch self {
+        case .sixFret: "6-fret"
+        case .fiveFret: "5-fret"
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .sixFret: "6-fret (GHL charts)"
+        case .fiveFret: "5-fret (classic charts)"
+        }
+    }
+
+    public var summary: String {
+        switch self {
+        case .sixFret: "Every fret on its own key, for Guitar Hero Live charts."
+        case .fiveFret: "Keys 1-5 for Green to Orange, for the classic five-lane charts."
+        }
+    }
+
+    public var keymap: Keymap {
+        switch self {
+        case .sixFret: .default
+        case .fiveFret: Keymap(bindings: Keymap.default.bindings.merging(Self.fiveFretLaneKeys) { _, lane in lane })
+        }
+    }
+
+    /// The preset whose keys these are exactly, or nil for a custom setup.
+    public static func matching(_ bindings: [Control: KeyCode]) -> KeymapPreset? {
+        allCases.first { $0.keymap.bindings == bindings }
+    }
+
+    /// Only the six frets differ from the 6-fret default. Green, Red and Yellow sit on the white (bottom) row,
+    /// Blue and Orange on the black (top) row, and black 1 also sends Green as a comfortable alternative for the
+    /// first column. A starting point: any key can be changed in Settings.
+    private static let fiveFretLaneKeys: [Control: KeyCode] = [
+        .white1: KeyCode.named("1")!, .black1: KeyCode.named("1")!,
+        .white2: KeyCode.named("2")!,
+        .white3: KeyCode.named("3")!,
+        .black2: KeyCode.named("4")!,
+        .black3: KeyCode.named("5")!,
+    ]
+}
+
 // MARK: - JSON
 
 private enum ThresholdName {

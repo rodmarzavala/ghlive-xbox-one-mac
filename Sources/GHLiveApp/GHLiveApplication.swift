@@ -3,11 +3,6 @@ import GHLiveAppKit
 import GHLiveCore
 import SwiftUI
 
-private enum WindowID {
-    static let settings = "settings"
-    static let monitor = "monitor"
-}
-
 /// Quitting by any route (menu, Cmd-Q, logout, SIGTERM) waits until every key is released and the dongle is
 /// closed, within the model's timeout.
 @MainActor
@@ -40,12 +35,12 @@ struct GHLiveApplication: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("GHLive Settings", id: WindowID.settings) {
+        Window("GHLive Settings", id: AppWindow.settings.rawValue) {
             SettingsView(model: delegate.model.settings)
         }
         .windowResizability(.contentSize)
 
-        Window("GHLive Input Monitor", id: WindowID.monitor) {
+        Window("GHLive Input Monitor", id: AppWindow.monitor.rawValue) {
             LiveMonitor(model: delegate.model, driver: delegate.model.driver)
         }
         .windowResizability(.contentSize)
@@ -54,11 +49,21 @@ struct GHLiveApplication: App {
 
 private struct LiveMenuIcon: View {
     @ObservedObject var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let status = model.menu.status
         Image(systemName: status.symbolName)
             .accessibilityLabel("GHLive: \(status.headline)")
+            .onAppear(perform: openRequestedWindow)
+    }
+
+    private func openRequestedWindow() {
+        let window = LaunchOptions.initialWindow(
+            arguments: Array(CommandLine.arguments.dropFirst()), environment: ProcessInfo.processInfo.environment)
+        guard let window else { return }
+        openWindow(id: window.rawValue)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -68,7 +73,7 @@ private struct LiveMonitor: View {
     @ObservedObject var driver: GuitarDriver
 
     var body: some View {
-        MonitorView(monitor: model.monitor)
+        MonitorView(monitor: model.monitor, guitarTest: model.guitarTest)
     }
 }
 
@@ -85,8 +90,8 @@ private struct LiveMenu: View {
         MenuActions(
             grantAccessibility: model.requestAccessibility,
             togglePause: model.togglePause,
-            openSettings: { show(WindowID.settings) },
-            openMonitor: { show(WindowID.monitor) },
+            openSettings: { show(.settings) },
+            openMonitor: { show(.monitor) },
             setLaunchAtLogin: model.setLaunchAtLogin,
             openLoginItems: model.openLoginItemsSettings,
             openKeymapFolder: model.openKeymapFolder,
@@ -96,8 +101,8 @@ private struct LiveMenu: View {
     }
 
     // An accessory app is never frontmost on its own, so its windows would open behind other apps.
-    private func show(_ id: String) {
-        openWindow(id: id)
+    private func show(_ window: AppWindow) {
+        openWindow(id: window.rawValue)
         NSApp.activate(ignoringOtherApps: true)
     }
 

@@ -47,6 +47,7 @@ public final class AppModel: ObservableObject {
 
     public let driver: GuitarDriver
     public let settings: SettingsModel
+    public let guitarTest: GuitarTestModel
 
     @Published public private(set) var keymap: Keymap
     @Published public private(set) var menu: MenuPresentation
@@ -92,6 +93,7 @@ public final class AppModel: ObservableObject {
         let problem = Self.problemText(settings.message)
         let launchState = launchAtLogin.state
         self.settings = settings
+        guitarTest = GuitarTestModel()
         statusPresentation = status
         isTrusted = accessibility.isTrusted
         self.launchState = launchState
@@ -101,6 +103,7 @@ public final class AppModel: ObservableObject {
             launchProblem: nil, keymapProblem: problem)
         settings.onSaved = { [weak self] saved in self?.apply(saved) }
         settings.onOpenKeymapFolder = { [weak self] in self?.openKeymapFolder() }
+        guitarTest.follow(driver.$snapshot)
         observeDriverAndSettings()
     }
 

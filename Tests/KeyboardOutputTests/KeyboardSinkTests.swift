@@ -130,3 +130,18 @@ struct KeyboardSinkTests {
         #expect(sink.pressedKeys.isEmpty)
     }
 }
+
+@MainActor
+@Suite("Keyboard sink with the 5-fret preset")
+struct FiveFretSinkTests {
+    @Test("a fret pair sharing Green holds one key until both are released")
+    func greenFromTwoFrets() throws {
+        let emitter = RecordingEmitter()
+        let sink = KeyboardSink(keymap: KeymapPreset.fiveFret.keymap, emitter: emitter)
+        let green = try #require(KeyCode.named("1"))
+        for controls: Set<Control> in [[.white1], [.white1, .black1], [.black1], []] {
+            sink.apply(state: idleState, controls: controls)
+        }
+        #expect(emitter.events == [.down(green), .up(green)])
+    }
+}
