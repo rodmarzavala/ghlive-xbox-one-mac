@@ -10,6 +10,7 @@ let package = Package(
         .executable(name: "GHLiveApp", targets: ["GHLiveApp"]),
     ],
     targets: [
+        .target(name: "ChartConversion"),
         .target(name: "GIPProtocol"),
         .target(name: "GuitarInput"),
         .target(name: "KeyMapping", dependencies: ["GuitarInput"]),
@@ -21,14 +22,20 @@ let package = Package(
         ),
         .target(
             name: "GHLiveCLI",
-            dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
+            dependencies: [
+                "ChartConversion", "GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput",
+                "USBTransport",
+            ]
         ),
         .executableTarget(name: "ghlive", dependencies: ["GHLiveCLI"]),
         .target(
             name: "GHLiveAppKit",
-            dependencies: ["GHLiveCore", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
+            dependencies: [
+                "ChartConversion", "GHLiveCore", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport",
+            ]
         ),
         .executableTarget(name: "GHLiveApp", dependencies: ["GHLiveAppKit"]),
+        .testTarget(name: "ChartConversionTests", dependencies: ["ChartConversion"]),
         .testTarget(name: "GIPProtocolTests", dependencies: ["GIPProtocol"]),
         .testTarget(name: "GuitarInputTests", dependencies: ["GuitarInput"]),
         .testTarget(name: "KeyMappingTests", dependencies: ["KeyMapping", "GuitarInput"]),
@@ -38,11 +45,13 @@ let package = Package(
             dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
         .testTarget(name: "USBTransportTests", dependencies: ["USBTransport"]),
-        .testTarget(name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput"]),
+        .testTarget(
+            name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "ChartConversion", "GHLiveCore", "GuitarInput"]),
         .testTarget(
             name: "GHLiveAppKitTests",
             dependencies: [
-                "GHLiveAppKit", "GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput",
+                "GHLiveAppKit", "ChartConversion", "GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping",
+                "KeyboardOutput",
                 "USBTransport",
             ]
         ),
