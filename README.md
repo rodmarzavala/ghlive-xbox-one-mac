@@ -130,7 +130,7 @@ Force/flip and tap notes, star power and solos are kept. `.chart` and `.mid` son
 
 **Your files are backed up first.** Before a song is changed, a copy of its files goes to a new folder next to your songs folder, named like `Clone Hero Songs - backup 2025-01-31 183000`, with the same folder structure. It is deliberately outside the songs folder, because Clone Hero would otherwise scan the copies as duplicate songs. Every new file is read back and checked (the same notes, the same timing) before it replaces the original; if anything fails, the original is left as it was. Running it again adds nothing.
 
-GHLive also adds `diff_guitarghl` to a song's `song.ini` when it is missing (copying the value of `diff_guitar`, or 0), since Clone Hero may hide the 6-fret part without it. An existing `diff_guitarghl` is never changed.
+GHLive also adds `diff_guitarghl` to a song's `song.ini` when it is missing (copying the value of `diff_guitar`, or 0), since Clone Hero may hide the 6-fret part without it. An existing `diff_guitarghl` is never changed, and the same fix is applied to songs that already had a 6-fret track.
 
 ![The result: a summary, the backup location and the list of songs](docs/images/chart-conversion-result-dark.png)
 

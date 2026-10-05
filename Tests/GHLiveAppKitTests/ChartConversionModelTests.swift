@@ -34,12 +34,16 @@ private final class FakeConverter: ChartConverting, @unchecked Sendable {
     var lastFolder: URL? { lock.withLock { folders.last } }
     var lastDryRun: Bool? { lock.withLock { dryRuns.last } }
 
-    func convert(folder: URL, dryRun: Bool) throws -> ConversionReport {
+    /// Songs reported through `onResult` before the conversion blocks on the gate.
+    var streamed: [SongResult] = []
+
+    func convert(folder: URL, dryRun: Bool, onResult: @Sendable (SongResult) -> Void) throws -> ConversionReport {
         lock.withLock {
             folders.append(folder)
             dryRuns.append(dryRun)
             if Thread.isMainThread { mainThreadCalls += 1 }
         }
+        streamed.forEach(onResult)
         gate?.wait()
         return try outcome.get()
     }
@@ -120,12 +124,69 @@ struct ChartConversionModelTests {
             picker: picker, converter: FakeConverter(outcome: .success(report()), gate: gate), reveal: { _ in })
         model.chooseFolder()
         let work = Task { await model.confirm() }
-        for _ in 0..<1000 where model.state != .converting(folder: songs) { await Task.yield() }
-        #expect(model.state == .converting(folder: songs))
+        for _ in 0..<1000 where model.state != .converting(folder: songs, progress: ConversionProgress()) {
+            await Task.yield()
+        }
+        #expect(model.state == .converting(folder: songs, progress: ConversionProgress()))
         #expect(model.chooseFolder() == false)
         gate.signal()
         await work.value
         #expect(model.state == .finished(report()))
+    }
+
+    @Test("dismissing while the conversion runs is ignored, so the window cannot hide a running job")
+    func dismissWhileConverting() async {
+        let gate = DispatchSemaphore(value: 0)
+        let picker = FakePicker()
+        picker.folder = songs
+        let model = ChartConversionModel(
+            picker: picker, converter: FakeConverter(outcome: .success(report()), gate: gate), reveal: { _ in })
+        model.chooseFolder()
+        let work = Task { await model.confirm() }
+        for _ in 0..<1000 where model.state == .confirming(folder: songs) { await Task.yield() }
+        model.dismiss()
+        model.cancel()
+        #expect(model.state == .converting(folder: songs, progress: ConversionProgress()))
+        gate.signal()
+        await work.value
+        #expect(model.state == .finished(report()))
+    }
+
+    @Test("each finished song moves the progress while the conversion runs")
+    func progressStreams() async {
+        let gate = DispatchSemaphore(value: 0)
+        let picker = FakePicker()
+        picker.folder = songs
+        let converter = FakeConverter(outcome: .success(report()), gate: gate)
+        converter.streamed = [
+            SongResult(path: "A/notes.chart", outcome: .noFiveFretTrack),
+            SongResult(path: "B/notes.mid", outcome: .noFiveFretTrack),
+        ]
+        let model = ChartConversionModel(picker: picker, converter: converter, reveal: { _ in })
+        model.chooseFolder()
+        let work = Task { await model.confirm() }
+        let expected = ConversionProgress(songsDone: 2, latest: "B/notes.mid")
+        for _ in 0..<5000 where model.state != .converting(folder: songs, progress: expected) { await Task.yield() }
+        #expect(model.state == .converting(folder: songs, progress: expected))
+        gate.signal()
+        await work.value
+    }
+
+    @Test("the menu item shows the window for a running, finished or failed job, and asks for a folder otherwise")
+    func beginFromMenu() async {
+        let (model, picker, _, _) = makeModel(picking: songs)
+        #expect(model.begin() == true)
+        #expect(picker.askedCount == 1)
+        #expect(model.state == .confirming(folder: songs))
+        #expect(model.begin() == true)
+        #expect(picker.askedCount == 1)
+        await model.confirm()
+        #expect(model.begin() == true)
+        #expect(picker.askedCount == 1)
+        model.dismiss()
+        picker.folder = nil
+        #expect(model.begin() == false)
+        #expect(picker.askedCount == 2)
     }
 
     @Test("a converter that throws shows the reason and nothing else")

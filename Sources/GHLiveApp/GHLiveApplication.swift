@@ -115,7 +115,7 @@ private struct LiveMenu: View {
     // The open panel needs the app in front; the window then shows the confirmation for the chosen folder.
     private func addSixFretTracks() {
         NSApp.activate(ignoringOtherApps: true)
-        if model.charts.chooseFolder() { show(.charts) }
+        if model.charts.begin() { show(.charts) }
     }
 
     private func showAbout() {

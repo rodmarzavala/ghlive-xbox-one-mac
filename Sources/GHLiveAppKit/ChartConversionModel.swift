@@ -29,21 +29,35 @@ public struct OpenPanelFolderPicker: FolderPicking {
 /// Seam over the conversion, so the model can be tested without touching disk. Implementations run on
 /// whatever thread calls them.
 public protocol ChartConverting: Sendable {
-    func convert(folder: URL, dryRun: Bool) throws -> ConversionReport
+    /// `onResult` is called from the converting thread as each song is done.
+    func convert(folder: URL, dryRun: Bool, onResult: @Sendable (SongResult) -> Void) throws -> ConversionReport
 }
 
 public struct LibraryChartConverter: ChartConverting {
     public init() {}
 
-    public func convert(folder: URL, dryRun: Bool) throws -> ConversionReport {
-        try SongLibraryConverter().convert(folder: folder, dryRun: dryRun)
+    public func convert(folder: URL, dryRun: Bool, onResult: @Sendable (SongResult) -> Void) throws -> ConversionReport
+    {
+        try SongLibraryConverter().convert(folder: folder, dryRun: dryRun, onResult: onResult)
+    }
+}
+
+/// How far a running conversion is.
+public struct ConversionProgress: Equatable, Sendable {
+    public var songsDone = 0
+    /// The path of the song that finished last.
+    public var latest: String?
+
+    public init(songsDone: Int = 0, latest: String? = nil) {
+        self.songsDone = songsDone
+        self.latest = latest
     }
 }
 
 public enum ChartConversionState: Equatable, Sendable {
     case idle
     case confirming(folder: URL)
-    case converting(folder: URL)
+    case converting(folder: URL, progress: ConversionProgress)
     case finished(ConversionReport)
     case failed(String)
 }
@@ -81,6 +95,14 @@ public final class ChartConversionModel: ObservableObject {
     /// Whether the conversion window has something to show.
     public var isPresenting: Bool { state != .idle }
 
+    /// What the menu item does: bring back a job that is waiting, running or done, or else ask for a folder.
+    /// Returns whether the window should be shown.
+    @discardableResult
+    public func begin() -> Bool {
+        if state == .idle { return chooseFolder() }
+        return true
+    }
+
     /// Asks for a folder. Returns whether one was chosen; a cancelled panel changes nothing.
     @discardableResult
     public func chooseFolder() -> Bool {
@@ -103,15 +125,26 @@ public final class ChartConversionModel: ObservableObject {
     /// Converts the chosen folder. Does nothing unless a folder is waiting for confirmation.
     public func confirm() async {
         guard case .confirming(let folder) = state else { return }
-        state = .converting(folder: folder)
+        state = .converting(folder: folder, progress: ConversionProgress())
         let converter = converter
-        let outcome = await Task.detached(priority: .userInitiated) {
-            Result { try converter.convert(folder: folder, dryRun: false) }
+        let outcome = await Task.detached(priority: .userInitiated) { [weak self] in
+            Result {
+                try converter.convert(folder: folder, dryRun: false) { result in
+                    Task { @MainActor in self?.record(result) }
+                }
+            }
         }.value
         switch outcome {
         case .success(let report): state = .finished(report)
         case .failure(let error): state = .failed(error.localizedDescription)
         }
+    }
+
+    private func record(_ result: SongResult) {
+        guard case .converting(let folder, var progress) = state else { return }
+        progress.songsDone += 1
+        progress.latest = result.path
+        state = .converting(folder: folder, progress: progress)
     }
 
     public func revealBackup() {

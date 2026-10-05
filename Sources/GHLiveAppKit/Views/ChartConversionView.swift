@@ -42,7 +42,7 @@ public struct ChartConversionView: View {
         switch model.state {
         case .idle: idle
         case .confirming(let folder): confirmation(folder)
-        case .converting(let folder): converting(folder)
+        case .converting(let folder, let progress): converting(folder, progress)
         case .finished(let report): result(report)
         case .failed(let message): failure(message)
         }
@@ -79,11 +79,20 @@ public struct ChartConversionView: View {
         }
     }
 
-    private func converting(_ folder: URL) -> some View {
-        HStack(spacing: 10) {
-            ProgressView().controlSize(.small)
-            Text("Converting the songs in \(folder.lastPathComponent)\u{2026} Keep GHLive open until this finishes.")
+    private func converting(_ folder: URL, _ progress: ConversionProgress) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text(
+                    "Converting the songs in \(folder.lastPathComponent)\u{2026} Keep GHLive open until this finishes."
+                )
                 .font(.callout)
+            }
+            if let latest = progress.latest {
+                Text("\(progress.songsDone) files done, last: \(latest)")
+                    .font(.caption).foregroundColor(.secondary)
+                    .lineLimit(Self.pathLineLimit).truncationMode(.middle)
+            }
         }
         .ghCard()
     }
