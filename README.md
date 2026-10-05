@@ -1,4 +1,4 @@
-# GHLive Mac
+# GHLive Xbox One for Mac
 
 Use the **Guitar Hero Live guitar with its Xbox One USB dongle on macOS**, for games such as [Clone Hero](https://clonehero.net/).
 
@@ -13,6 +13,8 @@ macOS ships no driver for this dongle: it stays unconfigured and its LED never t
 | Guitar Hero Live Xbox One wireless dongle | `1430:079B` |
 
 Apple Silicon and Intel Macs.
+
+Only the **Xbox One** dongle is supported. The PS3, Wii U and PS4 dongles are standard HID devices that Clone Hero reads directly, and the Xbox 360 dongle is out of scope.
 
 ## How it works
 
