@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- A "5-fret (classic charts)" keymap preset next to the default 6-fret one, so the guitar can play classic five-lane charts with keys 1-5. Settings shows which preset is active (or "Custom keys"), and `ghlive keymap --print-preset five-fret|six-fret` prints either as JSON.
+
 ### Changed
 
 - On macOS 26 and later the menu, Settings and Input Monitor use Liquid Glass; older systems keep the current look.

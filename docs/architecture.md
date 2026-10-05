@@ -14,7 +14,7 @@ GIPProtocol, GuitarInput, USBTransport: no dependencies on the other targets
 |---|---|
 | `GIPProtocol` | GIP framing (varint length), `decodePackets` for bundled transfers, packet builders, `SequenceCounter`, `GipSession` (handshake packets, ACKs, 8 s keep-alive). Pure, no I/O. |
 | `GuitarInput` | `parseGuitarReport` (0x21 layout), `GuitarState`, `Control`, `Thresholds`, `HysteresisDetector`, `ControlDetector`. Pure. |
-| `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
+| `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeymapPreset` (6-fret and 5-fret key sets), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
 | `KeyboardOutput` | `OutputSink` and `KeyEmitter` protocols, `KeyboardSink` (key diffs, shared keys, `releaseAll`), `CGEventKeyEmitter`, `DryRunKeyEmitter`, `AccessibilityPermission`. |
 | `USBTransport` | `PacketTransport`, `DongleConnecting`, `DongleEventSource` protocols; IOUSBHost `DongleConnection`; IOKit `DongleMonitor`. The only target that touches IOKit. |
 | `GHLiveCLI` | Argument parsing, the `run`, `sniff` and `keymap` commands and the verbose reporter, as a library so it is testable. `ghlive` is a one-line `main.swift` calling `runCLI`. |
