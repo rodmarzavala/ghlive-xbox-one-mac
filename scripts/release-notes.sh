@@ -15,7 +15,9 @@ if [[ -f "$changelog" ]]; then
             sub(/^## \[?v?/, "", heading)
             if (index(heading, version) == 1) {
                 rest = substr(heading, length(version) + 1)
-                if (rest == "" || rest ~ /^[] (]/) { inside = 1; next }
+                next_char = substr(rest, 1, 1)
+                # Plain comparisons instead of a bracket expression: mawk on the Ubuntu runner parses "[]" differently.
+                if (rest == "" || next_char == "]" || next_char == " " || next_char == "(") { inside = 1; next }
             }
         }
         inside { print }
