@@ -28,6 +28,7 @@ macOS ships no driver for this dongle: it stays unconfigured and its LED never t
 - Input Monitor: live frets, strum, buttons, d-pad, whammy and tilt meters with their thresholds, plus the keys currently being sent.
 - "Test my guitar": a checklist in the Input Monitor that confirms every control is read correctly.
 - Adjustable tilt and whammy thresholds.
+- Adds 6-fret tracks to your 5-fret Clone Hero songs, with a backup first.
 - Pause and Resume from the menu.
 - A command-line tool, `ghlive`, for diagnostics and headless use.
 - Sends only keyboard events. No network access, no data collection.
@@ -106,6 +107,37 @@ Black 1 also sends Green so the first column is comfortable from either row. Thi
 
 ![Settings with the 5-fret preset applied](docs/images/settings-preset-five-fret-light.png)
 
+## Play 5-fret songs as 6-fret
+
+Most Clone Hero charts have a 5-fret guitar track only. GHLive can add a 6-fret (GHL) track to them, so the song shows up under the **6-fret guitar** instrument in Clone Hero and you play it with the GHL guitar and its 6-fret keymap. The 5-fret track stays, and nothing is ever removed.
+
+Use **Add 6-fret tracks to songs...** in the menu-bar menu, or `ghlive charts add-ghl <folder>` in a terminal. Choose your Clone Hero songs folder; GHLive handles the folders inside it too, packs included.
+
+![The confirmation, which says where the backup will go](docs/images/chart-conversion-confirm-light.png)
+
+The conversion is automatic and the same every time: it follows Clone Hero's own pairing of the 5-fret and 6-fret controls, so the converted chart plays like the 5-fret chart does with the same key bindings. White 3 has no 5-fret counterpart, so it is never used. It is **not** a hand-made GHL chart; a chart written for the 6-fret guitar will play more naturally.
+
+| 5-fret lane | 6-fret lane |
+|---|---|
+| Green | Black 1 |
+| Red | Black 2 |
+| Yellow | Black 3 |
+| Blue | White 1 |
+| Orange | White 2 |
+| Open | Open |
+
+Force/flip and tap notes, star power and solos are kept. `.chart` and `.mid` songs are converted; `.sng` songs are skipped for now ("not supported yet"). The exact rules are in [docs/chart-conversion.md](docs/chart-conversion.md).
+
+**Your files are backed up first.** Before a song is changed, a copy of its files goes to a new folder next to your songs folder, named like `Clone Hero Songs - backup 2025-01-31 183000`, with the same folder structure. It is deliberately outside the songs folder, because Clone Hero would otherwise scan the copies as duplicate songs. Every new file is read back and checked (the same notes, the same timing) before it replaces the original; if anything fails, the original is left as it was. Running it again adds nothing.
+
+GHLive also adds `diff_guitarghl` to a song's `song.ini` when it is missing (copying the value of `diff_guitar`, or 0), since Clone Hero may hide the 6-fret part without it. An existing `diff_guitarghl` is never changed.
+
+![The result: a summary, the backup location and the list of songs](docs/images/chart-conversion-result-dark.png)
+
+**Then rescan your songs in Clone Hero**, so the new 6-fret parts show up.
+
+`ghlive charts add-ghl <folder> --dry-run` only reports what would change and writes nothing, not even a backup.
+
 ## Check that your guitar works
 
 Before you open Clone Hero, confirm in about a minute that every control is read correctly.
@@ -176,6 +208,7 @@ ghlive run [--dry-run] [--verbose] [--keymap PATH]   wait for the dongle and sen
 ghlive sniff                                          print the raw GIP packets (for bug reports)
 ghlive keymap --print-default                         print the default keymap as JSON
 ghlive keymap --print-preset five-fret|six-fret       print a keymap preset as JSON
+ghlive charts add-ghl <folder> [--dry-run]            add 6-fret tracks to the 5-fret songs in a folder
 ghlive --version
 ```
 
