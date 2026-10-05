@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (for example 0.1.0 or 0.1.0-beta.1). Must match the VERSION file."
+        required: true
+        type: string
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Test, build, attest and publish
+    runs-on: macos-15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve and check the version
+        id: version
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION#v}"
+          fi
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$version" != "$file_version" ]]; then
+            echo "::error::Requested version '$version' does not match the VERSION file ('$file_version')."
+            exit 1
+          fi
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: swift test
+
+      - name: Build the app and the CLI
+        run: scripts/build-app.sh
+
+      - name: Attest the app and the CLI
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/GHLive-${{ steps.version.outputs.version }}-macos-universal.zip
+            dist/ghlive-${{ steps.version.outputs.version }}-macos-universal.tar.gz
+
+      - name: Publish the GitHub Release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          tag="v${VERSION}"
+          scripts/release-notes.sh "$VERSION" > release-notes.md
+          assets=(dist/*.zip dist/*.zip.sha256 dist/*.tar.gz dist/*.tar.gz.sha256)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+            gh release edit "$tag" --notes-file release-notes.md \
+              --prerelease="$PRERELEASE"
+          else
+            flags=()
+            if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
+            gh release create "$tag" "${assets[@]}" \
+              --title "GHLive ${VERSION}" \
+              --notes-file release-notes.md \
+              --target "$GITHUB_SHA" \
+              "${flags[@]}"
+          fi
