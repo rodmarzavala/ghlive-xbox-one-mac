@@ -12,12 +12,11 @@ import sys
 import usb.core
 import usb.util
 
+from ghlproto.cli import EXIT_DEVICE_ERROR, EXIT_OK, not_plugged_in_message
 from ghlproto.descriptor_report import describe_configuration, describe_device, mask_serial
 from ghlproto.macos_registry import find_registry_devices, list_attached_objects, read_usb_registry
 from ghlproto.usb_ids import GHL_DONGLE_PRODUCT_ID, GHL_DONGLE_VENDOR_ID
 
-EXIT_FOUND = 0
-EXIT_NOT_FOUND = 1
 INDENT = "  "
 
 
@@ -101,12 +100,12 @@ def main() -> int:
     print_registry_view(arguments.vid, arguments.pid)
     devices = list(usb.core.find(find_all=True, idVendor=arguments.vid, idProduct=arguments.pid))
     if not devices:
-        print(f"No USB device {arguments.vid:04x}:{arguments.pid:04x} found. Is the dongle plugged in?")
-        return EXIT_NOT_FOUND
+        print(not_plugged_in_message(f"No USB device {arguments.vid:04x}:{arguments.pid:04x} found"))
+        return EXIT_DEVICE_ERROR
     for device in devices:
         print_libusb_view(device, arguments.show_serial)
         usb.util.dispose_resources(device)
-    return EXIT_FOUND
+    return EXIT_OK
 
 
 if __name__ == "__main__":
