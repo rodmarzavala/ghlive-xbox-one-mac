@@ -29,10 +29,14 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
     env:
       INPUT_VERSION: ${{ inputs.version }}
+      XCODE_VERSION: "26.4.1"
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
 
       - name: Resolve and check the version
         id: version

@@ -17,8 +17,12 @@ jobs:
   swift:
     name: Swift build, test and lint
     runs-on: macos-26
+    env:
+      XCODE_VERSION: "26.4.1"
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
       - name: Toolchain
         run: swift --version
       - name: Build
