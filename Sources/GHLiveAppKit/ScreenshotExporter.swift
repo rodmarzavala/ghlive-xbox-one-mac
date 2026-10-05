@@ -161,8 +161,13 @@ enum SampleStates {
         )
         let waiting = SettingsModel(keymap: .default, store: DiscardingStore())
         waiting.toggleRecording(.black1)
+        let fiveFret = SettingsModel(keymap: .default, store: DiscardingStore())
+        fiveFret.requestPreset(.fiveFret)
+        fiveFret.confirmPreset()
         return [
             SampleScreen(name: "settings", view: AnyView(SettingsView(model: saved, capturesKeys: false))),
+            SampleScreen(
+                name: "settings-preset-five-fret", view: AnyView(SettingsView(model: fiveFret, capturesKeys: false))),
             SampleScreen(
                 name: "settings-recording-rejected-key",
                 view: AnyView(SettingsView(model: recording, capturesKeys: false))),

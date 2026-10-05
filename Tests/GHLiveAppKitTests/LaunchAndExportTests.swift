@@ -68,6 +68,7 @@ struct ScreenshotExporterTests {
         #expect(files.count == SampleStates.screens().count * 2)
         #expect(files.contains { $0.lastPathComponent == "monitor-active-dark.png" })
         #expect(files.contains { $0.lastPathComponent == "settings-light.png" })
+        #expect(files.contains { $0.lastPathComponent == "settings-preset-five-fret-light.png" })
         let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
         for file in files {
             let data = try Data(contentsOf: file)
