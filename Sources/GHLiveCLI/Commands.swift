@@ -13,8 +13,6 @@ enum ExitCode {
     static let usage: Int32 = 2
 }
 
-private let terminationSignals = [SIGINT, SIGTERM, SIGHUP]
-
 private func printLine(_ text: String) {
     print(text)
     fflush(stdout)
@@ -144,7 +142,7 @@ private final class DiscardingSink: OutputSink {
 private func waitForTerminationSignal() async {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
         let resumer = OneShotResumer(continuation)
-        let sources = terminationSignals.map { number -> DispatchSourceSignal in
+        let sources = TerminationSignals.all.map { number -> DispatchSourceSignal in
             signal(number, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
             source.setEventHandler { resumer.resume() }

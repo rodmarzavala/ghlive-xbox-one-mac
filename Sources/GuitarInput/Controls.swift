@@ -53,6 +53,8 @@ extension DpadDirection {
 /// Digitises the analog whammy and tilt. Each engages at its threshold and releases once it falls
 /// `hysteresis` below it, so jitter around the threshold cannot make a key chatter.
 public struct Thresholds: Equatable, Sendable {
+    /// Largest raw tilt byte, and so the largest useful tilt threshold.
+    public static let tiltMaximum = 255
     public static let defaultWhammy = 0.5
     public static let defaultWhammyHysteresis = 0.1
     /// Measured on hardware: tilt rests at 95-115 and reaches about 171 when raised.
