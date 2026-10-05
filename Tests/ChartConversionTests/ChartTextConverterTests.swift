@@ -120,7 +120,7 @@ struct ChartTextConverterTests {
         #expect(try converter.convert(Data(first.text.utf8)) == .alreadyHasSixFret)
     }
 
-    @Test("a BOM is stripped and the text stays UTF-8, accents included")
+    @Test("a BOM is kept, so the edit only appends, and the text stays UTF-8, accents included")
     func bomAndEncoding() throws {
         let source =
             "\u{FEFF}" + C.text(lines: C.notes([(0, 0)])).replacingOccurrences(of: "Synthetic", with: "Sintético")
@@ -129,8 +129,29 @@ struct ChartTextConverterTests {
             Issue.record("not converted")
             return
         }
-        #expect(Array(data.prefix(3)) != [0xEF, 0xBB, 0xBF])
+        #expect(Array(data.prefix(3)) == [0xEF, 0xBB, 0xBF])
+        #expect(Array(data).starts(with: Array(source.utf8)))
+        #expect(try converter.verify(converted: data, original: Data(source.utf8)) == 1)
         #expect(String(decoding: data, as: UTF8.self).contains("Sintético"))
+    }
+
+    @Test("a file without a BOM does not get one")
+    func noBomAdded() throws {
+        let source = C.text(lines: C.notes([(0, 0)]))
+        let result = try #require(try convert(source))
+        #expect(!result.text.hasPrefix("\u{FEFF}"))
+        let data = try #require(try converter.convert(Data(source.utf8)).convertedData)
+        #expect(Array(data.prefix(3)) != [0xEF, 0xBB, 0xBF])
+    }
+
+    @Test("verification fails when the BOM of the original is gone")
+    func catchesLostBom() throws {
+        let source = "\u{FEFF}" + C.text(lines: C.notes([(0, 0)]))
+        let good = try #require(try converter.convert(Data(source.utf8)).convertedData)
+        let stripped = good.dropFirst(3)
+        #expect(throws: ConversionError.self) {
+            try converter.verify(converted: Data(stripped), original: Data(source.utf8))
+        }
     }
 
     @Test("a file that is not UTF-8 is refused, not mangled")
@@ -216,5 +237,12 @@ struct ChartTextConverterTests {
         #expect(throws: ConversionError.self) {
             try converter.verify(converted: Data(source.utf8), original: Data(source.utf8))
         }
+    }
+}
+
+extension ConversionAttempt {
+    var convertedData: Data? {
+        guard case .converted(let data, _) = self else { return nil }
+        return data
     }
 }

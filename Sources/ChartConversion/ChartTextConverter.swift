@@ -4,6 +4,8 @@ import Foundation
 /// has no 6-fret counterpart. The 5-fret sections are never touched.
 public struct ChartTextConverter: ChartFormatConverter {
     private static let byteOrderMark = "\u{FEFF}"
+    private static let byteOrderMarkBytes: [UInt8] = Array(byteOrderMark.utf8)
+    private static let lineFeedByte = UInt8(ascii: "\n")
 
     public init() {}
 
@@ -26,14 +28,17 @@ public struct ChartTextConverter: ChartFormatConverter {
                 section: difficulty.sixFretSection, lines: Self.sixFretLines(from: source.lines), to: converted,
                 lineBreak: lineBreak)
         }
-        return .converted(Data(converted.utf8), addedTracks: missing.map(\.sixFretSection))
+        let bom = data.starts(with: Self.byteOrderMarkBytes) ? Self.byteOrderMarkBytes : []
+        return .converted(Data(bom + Array(converted.utf8)), addedTracks: missing.map(\.sixFretSection))
     }
 
     public func verify(converted: Data, original: Data, context: ConversionContext) throws -> Int {
         let text = try Self.decode(converted)
-        // Bytes, not Characters: a lone CR is not a prefix of the CRLF grapheme that follows it.
-        let kept = Self.trimmingTrailingLineFeeds(try Self.decode(original))
-        guard Array(text.utf8).starts(with: Array(kept.utf8)) else {
+        // Bytes, BOM included, so the edit is provably append-only. Not Characters: a lone CR is not a prefix of
+        // the CRLF grapheme that follows it.
+        var kept = Array(original)
+        while kept.last == Self.lineFeedByte { kept.removeLast() }
+        guard Array(converted).starts(with: kept) else {
             throw ConversionError.verificationFailed("the original chart content changed")
         }
         let sections = try ChartText.guitarSections(ChartText.sections(of: text))
