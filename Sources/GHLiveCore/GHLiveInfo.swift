@@ -1,3 +1,3 @@
 public enum GHLiveInfo {
-    public static let version = "0.1.0-beta.3"
+    public static let version = "0.1.0-beta.4"
 }
