@@ -69,7 +69,7 @@ The app and CLI are universal (arm64 and x86_64), but they have not been tested 
 
 ## I only see colored notes, not black and white
 
-Your guitar's black-and-white notes only appear in songs that include a 6-fret (GHL) chart, when you pick the 6-fret guitar instrument for that song. Most community charts are 5-fret only and show colored notes; they still play with the default bindings. If a song should have a 6-fret chart but the instrument isn't offered, rescan your songs and check that the chart has a 6-fret part (an `[ExpertGHLGuitar]` section in `notes.chart`, or a `PART GUITAR GHL` track in `notes.mid`). See [Setting up Clone Hero](clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
+Your guitar's black-and-white notes only appear when your Clone Hero **player profile uses the 6-fret guitar instrument**, in songs that include a 6-fret (GHL) chart. Most community charts are 5-fret only and show colored notes; they still play with the default bindings. If a song should have a 6-fret chart but the instrument isn't offered, rescan your songs and check that the chart has a 6-fret part (an `[ExpertGHLGuitar]` section in `notes.chart`, or a `PART GUITAR GHL` track in `notes.mid`). See [Setting up Clone Hero](clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 
 ## Still stuck
 
