@@ -11,7 +11,8 @@ private final class SignalProbe {
 
 @MainActor
 struct TerminationSignalsTests {
-    private static let giveUp: Duration = .seconds(5)
+    // Generous on purpose, like the other polling waits: CI runners can stall the main actor for seconds.
+    private static let giveUp: Duration = .seconds(30)
     private static let poll: Duration = .milliseconds(20)
 
     @Test func theCliAndTheAppWatchTheSameSignals() {
