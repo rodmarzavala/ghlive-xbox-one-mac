@@ -1,5 +1,4 @@
 import AppKit
-import ChartConversion
 import GHLiveCore
 import GuitarInput
 import KeyMapping
@@ -72,7 +71,7 @@ enum SampleStates {
     private static let nearTilt: UInt8 = 142
 
     static func screens() -> [SampleScreen] {
-        menuScreens() + monitorScreens() + settingsScreens() + chartConversionScreens()
+        menuScreens() + monitorScreens() + settingsScreens()
     }
 
     // MARK: Menu
@@ -205,48 +204,6 @@ enum SampleStates {
         let state = GuitarState(pressedButtons: buttons, dpad: dpad, whammy: whammy, tilt: tilt)
         var detector = ControlDetector(thresholds: thresholds)
         return GuitarSnapshot(state: state, controls: detector.detect(state))
-    }
-
-    // MARK: Chart conversion
-
-    private static let sampleSongs = URL(fileURLWithPath: "/Users/you/Clone Hero Songs", isDirectory: true)
-    private static let sampleBackup = URL(
-        fileURLWithPath: "/Users/you/Clone Hero Songs - backup 2025-01-31 183000", isDirectory: true)
-
-    private static func chartConversion(_ name: String, _ state: ChartConversionState) -> SampleScreen {
-        let model = ChartConversionModel(state: state)
-        return SampleScreen(
-            name: name, view: AnyView(ChartConversionView(model: model, scrollsSongList: false)))
-    }
-
-    private static func sampleReport(failing: Bool) -> ConversionReport {
-        let converted = SongOutcome.converted(
-            addedTracks: ["ExpertGHLGuitar"], notes: 1_204, songIni: .added(value: "3"))
-        var results = [
-            SongResult(path: "Synthetic Artist - Synthetic Song/notes.chart", outcome: converted),
-            SongResult(
-                path: "Pack One/Another Artist - Another Song/notes.mid",
-                outcome: .converted(addedTracks: ["PART GUITAR GHL"], notes: 3_872, songIni: .alreadyPresent)),
-            SongResult(
-                path: "Pack One/Third Artist - Third Song/notes.chart",
-                outcome: .alreadyHasSixFret(songIni: .added(value: "2"))),
-            SongResult(path: "Pack Two/Fourth Artist - Fourth Song/song.sng", outcome: .unsupportedFormat),
-        ]
-        if failing {
-            results.append(
-                SongResult(
-                    path: "Pack Two/Fifth Artist - Fifth Song/notes.mid",
-                    outcome: .failed("the MIDI file ends inside a MTrk chunk")))
-        }
-        return ConversionReport(root: sampleSongs, isDryRun: false, results: results, backupFolder: sampleBackup)
-    }
-
-    private static func chartConversionScreens() -> [SampleScreen] {
-        [
-            chartConversion("chart-conversion-confirm", .confirming(folder: sampleSongs)),
-            chartConversion("chart-conversion-result", .finished(sampleReport(failing: false))),
-            chartConversion("chart-conversion-result-problem", .finished(sampleReport(failing: true))),
-        ]
     }
 
     // MARK: Settings

@@ -40,11 +40,6 @@ struct GHLiveApplication: App {
         }
         .windowResizability(.contentSize)
 
-        Window("Add 6-fret tracks", id: AppWindow.charts.rawValue) {
-            ChartConversionView(model: delegate.model.charts)
-        }
-        .windowResizability(.contentSize)
-
         Window("GHLive Input Monitor", id: AppWindow.monitor.rawValue) {
             LiveMonitor(model: delegate.model, driver: delegate.model.driver)
         }
@@ -100,7 +95,6 @@ private struct LiveMenu: View {
             setLaunchAtLogin: model.setLaunchAtLogin,
             openLoginItems: model.openLoginItemsSettings,
             openKeymapFolder: model.openKeymapFolder,
-            addSixFretTracks: addSixFretTracks,
             showAbout: showAbout,
             quit: { NSApp.terminate(nil) }
         )
@@ -110,12 +104,6 @@ private struct LiveMenu: View {
     private func show(_ window: AppWindow) {
         openWindow(id: window.rawValue)
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    // The open panel needs the app in front; the window then shows the confirmation for the chosen folder.
-    private func addSixFretTracks() {
-        NSApp.activate(ignoringOtherApps: true)
-        if model.charts.begin() { show(.charts) }
     }
 
     private func showAbout() {

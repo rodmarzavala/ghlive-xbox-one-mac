@@ -28,7 +28,6 @@ macOS ships no driver for this dongle: it stays unconfigured and its LED never t
 - Input Monitor: live frets, strum, buttons, d-pad, whammy and tilt meters with their thresholds, plus the keys currently being sent.
 - "Test my guitar": a checklist in the Input Monitor that confirms every control is read correctly.
 - Adjustable tilt and whammy thresholds.
-- Adds 6-fret tracks to your 5-fret Clone Hero songs, with a backup first.
 - Pause and Resume from the menu.
 - A command-line tool, `ghlive`, for diagnostics and headless use.
 - Sends only keyboard events. No network access, no data collection.
@@ -82,18 +81,17 @@ Settings has a **Preset** row at the top. **6-fret (GHL charts)** is the default
 
 ## Set up Clone Hero
 
-GHLive makes the guitar look like a keyboard, so the game needs to know which key is which control. Clone Hero supports 6-fret (GHL) guitars, and its controls can be bound to keys. In the game's controller settings, bind each guitar control to the key GHLive sends for it, using the table above (or your own keys from GHLive's Settings). Keep the game as the active window while you play: macOS delivers key presses to the app in front.
+**Step-by-step guide: [Setting up Clone Hero with GHLive](docs/clone-hero-setup.md)** (bindings, adding songs, 6-fret vs. 5-fret charts).
 
-[YARG](https://yarg.in/) works the same way, since it accepts keyboard input: bind the keys in its own controller settings.
+In short: Clone Hero's control rows carry two names, for example **Green | Black 1** and **Blue | White 1**. Click a cell in the **Keyboard** column and press that control on the guitar; GHLive sends the key for you. Keep the game as the active window while you play, because macOS delivers key presses to the app in front.
 
-The exact menu names differ between game versions, so this guide does not spell them out. The Input Monitor helps here: it shows which key each control is sending right now.
+[YARG](https://yarg.in/) accepts keyboard input too: bind the keys in its own controller settings (not tested yet).
 
 ### Playing classic 5-fret charts
 
-Many charts are 5-fret only. To play a 5-fret chart with the 6-fret guitar:
+Most community charts show colored 5-fret notes. They play with the default bindings above: Green/Red/Yellow are Black 1/2/3, and Blue/Orange are White 1/2. Black-and-white notes only appear in songs that have a 6-fret (GHL) chart.
 
-1. In GHLive's Settings, choose the **5-fret (classic charts)** preset and confirm.
-2. In the game, bind the keyboard as a regular 5-fret guitar using the keys `1` to `5` for Green, Red, Yellow, Blue and Orange. The strum bar, Hero Power (Star Power), whammy and pause keys are the same as in the table above.
+If you prefer another layout, GHLive's **5-fret (classic charts)** preset puts the five lanes on keys `1` to `5`:
 
 | Lane | Key | Guitar control |
 |---|---|---|
@@ -103,40 +101,9 @@ Many charts are 5-fret only. To play a 5-fret chart with the 6-fret guitar:
 | Blue | `4` | Black 2 (top row) |
 | Orange | `5` | Black 3 (top row) |
 
-Black 1 also sends Green so the first column is comfortable from either row. This layout is a starting point: click any control in Settings to give it another key.
+Choose it in GHLive's Settings, then re-bind Clone Hero's five colored rows with the preset's keys: for **Green**, **Red**, **Yellow**, **Blue** and **Orange**, press White 1, White 2, White 3, Black 2 and Black 3 on the guitar (keys `1` to `5`). Ignore the Black/White name on each row while this preset is active. Switch back to the 6-fret preset and re-bind before playing 6-fret charts.
 
 ![Settings with the 5-fret preset applied](docs/images/settings-preset-five-fret-light.png)
-
-## Play 5-fret songs as 6-fret
-
-Most Clone Hero charts have a 5-fret guitar track only. GHLive can add a 6-fret (GHL) track to them, so the song shows up under the **6-fret guitar** instrument in Clone Hero and you play it with the GHL guitar and its 6-fret keymap. The 5-fret track stays, and nothing is ever removed.
-
-Use **Add 6-fret tracks to songs...** in the menu-bar menu, or `ghlive charts add-ghl <folder>` in a terminal. Choose your Clone Hero songs folder; GHLive handles the folders inside it too, packs included.
-
-![The confirmation, which says where the backup will go](docs/images/chart-conversion-confirm-light.png)
-
-The conversion is automatic and the same every time: it follows Clone Hero's own pairing of the 5-fret and 6-fret controls, so the converted chart plays like the 5-fret chart does with the same key bindings. White 3 has no 5-fret counterpart, so it is never used. It is **not** a hand-made GHL chart; a chart written for the 6-fret guitar will play more naturally.
-
-| 5-fret lane | 6-fret lane |
-|---|---|
-| Green | Black 1 |
-| Red | Black 2 |
-| Yellow | Black 3 |
-| Blue | White 1 |
-| Orange | White 2 |
-| Open | Open |
-
-Force/flip and tap notes, star power and solos are kept. `.chart` and `.mid` songs are converted; `.sng` songs are skipped for now ("not supported yet"). The exact rules are in [docs/chart-conversion.md](docs/chart-conversion.md).
-
-**Your files are backed up first.** Before a song is changed, a copy of its files goes to a new folder next to your songs folder, named like `Clone Hero Songs - backup 2025-01-31 183000`, with the same folder structure. It is deliberately outside the songs folder, because Clone Hero would otherwise scan the copies as duplicate songs. Every new file is read back and checked (the same notes, the same timing) before it replaces the original; if anything fails, the original is left as it was. Running it again adds nothing.
-
-GHLive also adds `diff_guitarghl` to a song's `song.ini` when it is missing (copying the value of `diff_guitar`, or 0), since Clone Hero may hide the 6-fret part without it. An existing `diff_guitarghl` is never changed, and the same fix is applied to songs that already had a 6-fret track.
-
-![The result: a summary, the backup location and the list of songs](docs/images/chart-conversion-result-dark.png)
-
-**Then rescan your songs in Clone Hero**, so the new 6-fret parts show up.
-
-`ghlive charts add-ghl <folder> --dry-run` only reports what would change and writes nothing, not even a backup.
 
 ## Check that your guitar works
 
@@ -208,7 +175,6 @@ ghlive run [--dry-run] [--verbose] [--keymap PATH]   wait for the dongle and sen
 ghlive sniff                                          print the raw GIP packets (for bug reports)
 ghlive keymap --print-default                         print the default keymap as JSON
 ghlive keymap --print-preset five-fret|six-fret       print a keymap preset as JSON
-ghlive charts add-ghl <folder> [--dry-run]            add 6-fret tracks to the 5-fret songs in a folder
 ghlive --version
 ```
 
@@ -222,6 +188,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **The guitar does not sync.** Switch the guitar on once the status reads "Dongle ready".
 - **"The dongle is in use by another app".** Quit Steam, or any other app that reads Xbox controllers. GHLive retries every few seconds.
 - **A control never gets its check in "Test my guitar".** The Input Monitor does not see it: see [Check that your guitar works](#check-that-your-guitar-works) and [docs/troubleshooting.md](docs/troubleshooting.md#a-control-fails-the-guitar-test).
+- **I only see colored notes, not black and white.** Most likely, that song has no 6-fret (GHL) chart, or the 6-fret instrument isn't selected: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.

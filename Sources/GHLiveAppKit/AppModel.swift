@@ -48,7 +48,6 @@ public final class AppModel: ObservableObject {
     public let driver: GuitarDriver
     public let settings: SettingsModel
     public let guitarTest: GuitarTestModel
-    public let charts: ChartConversionModel
 
     @Published public private(set) var keymap: Keymap
     @Published public private(set) var menu: MenuPresentation
@@ -79,7 +78,6 @@ public final class AppModel: ObservableObject {
         accessibility: any AccessibilityChecking,
         launchAtLogin: any LaunchAtLoginControlling,
         openURL: @escaping (URL) -> Void,
-        charts: ChartConversionModel = ChartConversionModel(),
         pollInterval: Duration = AppModel.defaultPollInterval
     ) {
         self.driver = driver
@@ -96,7 +94,6 @@ public final class AppModel: ObservableObject {
         let launchState = launchAtLogin.state
         self.settings = settings
         guitarTest = GuitarTestModel()
-        self.charts = charts
         statusPresentation = status
         isTrusted = accessibility.isTrusted
         self.launchState = launchState

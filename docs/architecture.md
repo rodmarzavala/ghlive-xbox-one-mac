@@ -8,7 +8,6 @@ GHLiveCore -> GIPProtocol, GuitarInput, KeyMapping, KeyboardOutput, USBTransport
 KeyMapping -> GuitarInput
 KeyboardOutput -> GuitarInput, KeyMapping
 GIPProtocol, GuitarInput, USBTransport: no dependencies on the other targets
-GHLiveCLI and GHLiveAppKit also use ChartConversion (no dependencies, no UI)
 ```
 
 | Target | Responsibility |
@@ -18,8 +17,7 @@ GHLiveCLI and GHLiveAppKit also use ChartConversion (no dependencies, no UI)
 | `KeyMapping` | `Keymap` (control to key, thresholds; JSON, validated), `KeymapPreset` (6-fret and 5-fret key sets), `KeyCode` table (Carbon `kVK_*`), `KeymapStore` (`~/Library/Application Support/GHLive/keymap.json`). |
 | `KeyboardOutput` | `OutputSink` and `KeyEmitter` protocols, `KeyboardSink` (key diffs, shared keys, `releaseAll`), `CGEventKeyEmitter`, `DryRunKeyEmitter`, `AccessibilityPermission`. |
 | `USBTransport` | `PacketTransport`, `DongleConnecting`, `DongleEventSource` protocols; IOUSBHost `DongleConnection`; IOKit `DongleMonitor`. The only target that touches IOKit. |
-| `ChartConversion` | Adds 6-fret tracks to 5-fret charts: a minimal Standard MIDI File reader/writer, `.chart` sections, the converters and verifiers, the `song.ini` patch and `SongLibraryConverter` (backup, atomic replace, dry run). See [chart-conversion.md](chart-conversion.md). |
-| `GHLiveCLI` | Argument parsing, the `run`, `sniff`, `keymap` and `charts` commands and the verbose reporter, as a library so it is testable. `ghlive` is a one-line `main.swift` calling `runCLI`. |
+| `GHLiveCLI` | Argument parsing, the `run`, `sniff` and `keymap` commands and the verbose reporter, as a library so it is testable. `ghlive` is a one-line `main.swift` calling `runCLI`. |
 | `GHLiveCore` | `GuitarDriver`: monitor, connection, session, parser, detector, sink. Observable status and live input for UIs. |
 
 ## Data flow
