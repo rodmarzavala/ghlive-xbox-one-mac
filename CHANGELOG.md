@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-06
+
+First stable release: play the Guitar Hero Live guitar with its Xbox One dongle on macOS, in Clone Hero and other games that take keyboard input.
+
+### Highlights
+
+- Menu-bar app for macOS 13 or newer, universal (Apple Silicon and Intel), with no kernel extension, no SIP change and no driver to install.
+- Every fret, the strum bar, Hero Power, Pause, GHTV, the d-pad, whammy and tilt become key presses, released safely on pause, disconnect and quit.
+- Automatic reconnection, Settings to rebind keys with 6-fret and 5-fret presets, the Input Monitor and "Test my guitar".
+- Liquid Glass on macOS 26 and later.
+- A [Clone Hero setup guide](https://github.com/rodmarzavala/ghlive-xbox-one-mac/blob/main/docs/clone-hero-setup.md), including the step that shows black-and-white notes: set your player profile's instrument to the 6-fret guitar.
+
+### Changed
+
+- The Clone Hero guide and troubleshooting now explain that black-and-white notes need the player profile's 6-fret guitar instrument.
+
+### Known limitations
+
+- Not yet tested on an Intel Mac or on macOS 13-15; reports are welcome in the [beta testers issue](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/1).
+- Keyboard output only: whammy and tilt act as on/off keys, not analog.
+- The app is ad-hoc signed, not notarized, so the first launch needs "Open Anyway".
+
 ## [0.1.0-beta.4] - 2026-10-06
 
 ### Added
