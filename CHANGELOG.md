@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-06
+
+### Fixed
+
+- Card shadows in the Settings and Input Monitor windows are no longer cut off at the edges, and the faint lighter box around the content is gone. The windows only scroll when they cannot fit the screen.
+
 ## [1.0.0] - 2026-10-06
 
 First stable release: play the Guitar Hero Live guitar with its Xbox One dongle on macOS, in Clone Hero and other games that take keyboard input.
