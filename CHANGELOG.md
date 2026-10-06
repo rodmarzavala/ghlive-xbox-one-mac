@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.1.0-beta.3] - 2026-10-05
+
+### Added
+
+- "Add 6-fret tracks to songs..." in the menu and `ghlive charts add-ghl <folder> [--dry-run]`: adds a 6-fret (GHL) guitar track to the 5-fret `.chart` and `.mid` songs of a Clone Hero folder, following Clone Hero's control pairing. Originals are backed up to a folder next to the songs folder first, every result is verified before it replaces the original, `diff_guitarghl` is added to `song.ini` when missing, and `.sng` songs are skipped. Charts keep their byte-order mark, a chart with duplicated sections is refused, and old-style Star Power on note 103 is converted to 116.
+
 ## [0.1.0-beta.2] - 2026-10-05
 
 ### Fixed

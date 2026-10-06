@@ -1,3 +1,4 @@
+import ChartConversion
 import Combine
 import Foundation
 import GHLiveCore
@@ -44,10 +45,32 @@ func execute(_ command: Command) async -> Int32 {
         return ExitCode.success
     case .printKeymap(let preset):
         return printKeymap(preset)
+    case .addGHLTracks(let options):
+        return addGHLTracks(options, output: printLine, errorOutput: printError)
     case .run(let options):
         return await run(options)
     case .sniff:
         return await sniff()
+    }
+}
+
+/// Prints one line per song as it finishes, then the summary. Exits non-zero if any song failed.
+func addGHLTracks(
+    _ options: AddGHLOptions, output: (String) -> Void, errorOutput: (String) -> Void
+) -> Int32 {
+    let converter = SongLibraryConverter()
+    let folder = URL(fileURLWithPath: options.folder)
+    do {
+        let report = try converter.convert(folder: folder, dryRun: options.dryRun) {
+            output($0.line(dryRun: options.dryRun))
+        }
+        output(report.summary)
+        if let backup = report.backupFolder { output("originals backed up to \(backup.path)") }
+        if !options.dryRun, report.convertedCount > 0 { output(ConversionReport.rescanReminder) }
+        return report.hasFailures ? ExitCode.failure : ExitCode.success
+    } catch {
+        errorOutput("ghlive: \(error.localizedDescription)")
+        return ExitCode.failure
     }
 }
 

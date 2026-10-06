@@ -9,6 +9,7 @@ public struct MenuActions {
     public var setLaunchAtLogin: (Bool) -> Void
     public var openLoginItems: () -> Void
     public var openKeymapFolder: () -> Void
+    public var addSixFretTracks: () -> Void
     public var showAbout: () -> Void
     public var quit: () -> Void
 
@@ -20,6 +21,7 @@ public struct MenuActions {
         setLaunchAtLogin: @escaping (Bool) -> Void = { _ in },
         openLoginItems: @escaping () -> Void = {},
         openKeymapFolder: @escaping () -> Void = {},
+        addSixFretTracks: @escaping () -> Void = {},
         showAbout: @escaping () -> Void = {},
         quit: @escaping () -> Void = {}
     ) {
@@ -30,6 +32,7 @@ public struct MenuActions {
         self.setLaunchAtLogin = setLaunchAtLogin
         self.openLoginItems = openLoginItems
         self.openKeymapFolder = openKeymapFolder
+        self.addSixFretTracks = addSixFretTracks
         self.showAbout = showAbout
         self.quit = quit
     }
@@ -77,6 +80,9 @@ public struct MenuContentView: View {
                     }
                 }
                 MenuRow(title: "Open keymap folder", symbol: "folder", action: actions.openKeymapFolder)
+                MenuRow(
+                    title: "Add 6-fret tracks to songs\u{2026}", symbol: "music.note.list",
+                    action: actions.addSixFretTracks)
                 Divider().padding(.vertical, 4)
                 MenuRow(title: "About GHLive", symbol: "info.circle", action: actions.showAbout)
                 MenuRow(title: "Quit GHLive", symbol: "power", action: actions.quit)
