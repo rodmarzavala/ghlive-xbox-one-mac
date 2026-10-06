@@ -7,16 +7,10 @@ struct RunOptions: Equatable {
     var keymapPath: String?
 }
 
-struct AddGHLOptions: Equatable {
-    var folder: String
-    var dryRun = false
-}
-
 enum Command: Equatable {
     case run(RunOptions)
     case sniff
     case printKeymap(KeymapPreset)
-    case addGHLTracks(AddGHLOptions)
     case version
     case help
 }
@@ -58,12 +52,6 @@ let usage = """
                       Print a keymap preset as JSON: six-fret for Guitar Hero Live charts,
                       five-fret for classic 5-lane charts (keys 1-5).
 
-      charts add-ghl <folder> [--dry-run]
-                      Add 6-fret (GHL) guitar tracks to the 5-fret charts in a songs folder, so the
-                      songs can be played with the guitar. Originals are copied to a backup folder
-                      next to <folder> first; existing tracks are never removed. --dry-run only
-                      reports what would change.
-
     options:
       --version       Print the version.
       --help          Print this help.
@@ -78,30 +66,8 @@ func parseArguments(_ arguments: [String]) throws -> Command {
     case "run": return .run(try parseRunOptions(rest))
     case "sniff": return try requireNoOptions(rest, command: first, result: .sniff)
     case "keymap": return try parseKeymapOptions(rest)
-    case "charts": return try parseChartsOptions(rest)
     default: throw ArgumentError.unknownCommand(first)
     }
-}
-
-private let addGHLSubcommand = "add-ghl"
-
-private func parseChartsOptions(_ arguments: [String]) throws -> Command {
-    guard let subcommand = arguments.first else { throw ArgumentError.missingValue("charts \(addGHLSubcommand)") }
-    guard subcommand == addGHLSubcommand else { throw ArgumentError.unknownCommand("charts \(subcommand)") }
-    let command = "charts \(addGHLSubcommand)"
-    var folder: String?
-    var dryRun = false
-    for argument in arguments.dropFirst() {
-        if argument == "--dry-run" {
-            dryRun = true
-        } else if argument.hasPrefix("--") || folder != nil {
-            throw ArgumentError.unknownOption(argument, command: command)
-        } else {
-            folder = argument
-        }
-    }
-    guard let folder else { throw ArgumentError.missingValue("\(command) <folder>") }
-    return .addGHLTracks(AddGHLOptions(folder: folder, dryRun: dryRun))
 }
 
 private let printDefaultOption = "--print-default"

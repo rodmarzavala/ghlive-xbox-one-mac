@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Removed
+
+- The 5-fret to 6-fret chart converter ("Add 6-fret tracks to songs..." and `ghlive charts add-ghl`), to keep GHLive focused on the guitar for 1.0. It remains available in 0.1.0-beta.3 and may return as a separate project.
+
 ## [0.1.0-beta.3] - 2026-10-05
 
 ### Added
