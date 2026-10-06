@@ -70,3 +70,7 @@ The app and CLI are universal (arm64 and x86_64), but they have not been tested 
 ## Still stuck
 
 Open a [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose). Include your macOS version, chip, app version and, if you can, `ghlive sniff` output (see [CONTRIBUTING](../CONTRIBUTING.md#capturing-a-packet-log)).
+
+## I only see colored notes, not black and white
+
+Your guitar's black-and-white notes only appear in songs that include a 6-fret (GHL) chart, when you pick the 6-fret guitar instrument for that song. Most community charts are 5-fret only and show colored notes; they still play with the default bindings. If a song should have a 6-fret chart but the instrument isn't offered, rescan your songs and check that its `song.ini` has a `diff_guitarghl` line. See [Setting up Clone Hero](clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).

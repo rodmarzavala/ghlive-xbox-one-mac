@@ -1,0 +1,59 @@
+name: Beta test report
+description: Tried a GHLive beta? Tell us how it went, good or bad.
+title: "Beta report: "
+labels: ["beta-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Every report helps get GHLive to 1.0, including "everything worked".
+        Do not include your dongle's serial number or any personal data.
+  - type: input
+    id: version
+    attributes:
+      label: GHLive version
+      description: Menu → About GHLive
+      placeholder: "e.g. 0.1.0-beta.4"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 14.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Mac chip
+      options:
+        - Apple Silicon (M1 or later)
+        - Intel
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: What worked
+      description: Tick what you tried and what worked. Leave the rest unticked and tell us below.
+      options:
+        - label: Opened the app (Open Anyway) and granted Accessibility
+        - label: The dongle LED turned on and the guitar connected
+        - label: "Input Monitor → Test my guitar reached 17 of 17"
+        - label: Bound the controls in Clone Hero and played a full song
+        - label: Played a 6-fret (GHL) chart with black and white notes
+        - label: Unplugging and replugging the dongle reconnected by itself
+        - label: Quitting GHLive left no key stuck
+  - type: input
+    id: game
+    attributes:
+      label: Game and version
+      placeholder: "e.g. Clone Hero 1.1, YARG"
+  - type: textarea
+    id: notes
+    attributes:
+      label: How did it go?
+      description: Anything that felt off (lag, stuck keys, tilt too sensitive, confusing steps) or anything you liked.
+    validations:
+      required: true
