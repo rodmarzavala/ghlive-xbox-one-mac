@@ -19,7 +19,7 @@ public struct MonitorView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: ScreenFit.footerSpacing) {
             ScrollsWithinScreen(isEnabled: limitsHeight, reservedHeight: Self.keysStripHeight) {
                 GlassGroup {
                     VStack(alignment: .leading, spacing: 14) {
