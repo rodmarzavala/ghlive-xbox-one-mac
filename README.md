@@ -101,7 +101,7 @@ If you prefer another layout, GHLive's **5-fret (classic charts)** preset puts t
 | Blue | `4` | Black 2 (top row) |
 | Orange | `5` | Black 3 (top row) |
 
-Choose it in GHLive's Settings, then bind Clone Hero's rows again while it is active.
+Choose it in GHLive's Settings, then re-bind Clone Hero's five colored rows with the preset's keys: for **Green**, **Red**, **Yellow**, **Blue** and **Orange**, press White 1, White 2, White 3, Black 2 and Black 3 on the guitar (keys `1` to `5`). Ignore the Black/White name on each row while this preset is active. Switch back to the 6-fret preset and re-bind before playing 6-fret charts.
 
 ![Settings with the 5-fret preset applied](docs/images/settings-preset-five-fret-light.png)
 
@@ -188,7 +188,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **The guitar does not sync.** Switch the guitar on once the status reads "Dongle ready".
 - **"The dongle is in use by another app".** Quit Steam, or any other app that reads Xbox controllers. GHLive retries every few seconds.
 - **A control never gets its check in "Test my guitar".** The Input Monitor does not see it: see [Check that your guitar works](#check-that-your-guitar-works) and [docs/troubleshooting.md](docs/troubleshooting.md#a-control-fails-the-guitar-test).
-- **I only see colored notes, not black and white.** That song has no 6-fret (GHL) chart, or the 6-fret instrument isn't selected: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
+- **I only see colored notes, not black and white.** Most likely, that song has no 6-fret (GHL) chart, or the 6-fret instrument isn't selected: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.
