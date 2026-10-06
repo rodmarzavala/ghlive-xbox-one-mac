@@ -30,20 +30,60 @@ struct ScrollsWithinScreenHostingTests {
     private let settleRounds = 20
     private let settleStep: Duration = .milliseconds(20)
 
-    private func hostedHeight(contentHeight: CGFloat) async throws -> CGFloat {
+    private let contentWidth: CGFloat = 200
+
+    private func hosted(contentHeight: CGFloat) async throws -> NSHostingView<ScrollsWithinScreen<some View>> {
         let root = ScrollsWithinScreen(reservedHeight: reserved, screenHeight: screen) {
-            Color.orange.frame(width: 200, height: contentHeight)
+            Color.orange.frame(width: contentWidth, height: contentHeight)
         }
         let hosting = NSHostingView(rootView: root)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.borderless], backing: .buffered,
-            defer: false)
+            contentRect: NSRect(x: 0, y: 0, width: contentWidth, height: 100), styleMask: [.borderless],
+            backing: .buffered, defer: false)
         window.contentView = hosting
         for _ in 0..<settleRounds {
             try await Task.sleep(for: settleStep)
             hosting.layoutSubtreeIfNeeded()
         }
-        return hosting.fittingSize.height
+        return hosting
+    }
+
+    private func hostedHeight(contentHeight: CGFloat) async throws -> CGFloat {
+        try await hosted(contentHeight: contentHeight).fittingSize.height
+    }
+
+    private func scrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView { return scroll }
+        return view.subviews.lazy.compactMap { scrollView(in: $0) }.first
+    }
+
+    @Test func theScrollAreaLeavesRoomForShadowsWithoutChangingTheLayout() async throws {
+        let hosting = try await hosted(contentHeight: 3000)
+        let scroll = try #require(scrollView(in: hosting))
+        let footprint = hosting.fittingSize
+        #expect(scroll.frame.width - footprint.width == 2 * ScreenFit.shadowAllowance)
+        #expect(scroll.frame.height - footprint.height == 2 * ScreenFit.shadowAllowance)
+        #expect(ScreenFit.footerSpacing > ScreenFit.shadowAllowance)
+        #expect(footprint.height == screen - ScreenFit.windowChrome - reserved)
+    }
+
+    private var available: CGFloat { screen - ScreenFit.windowChrome - reserved }
+
+    @Test func contentExactlyAsTallAsTheSpaceDoesNotScroll() async throws {
+        let hosting = try await hosted(contentHeight: available)
+        #expect(scrollView(in: hosting) == nil)
+        #expect(hosting.fittingSize.height == available)
+    }
+
+    @Test func onePointMoreScrollsAndKeepsTheFootprint() async throws {
+        let hosting = try await hosted(contentHeight: available + 1)
+        #expect(scrollView(in: hosting) != nil)
+        #expect(hosting.fittingSize.height == available)
+    }
+
+    @Test func aViewThatFitsIsNotWrappedInAScrollView() async throws {
+        let hosting = try await hosted(contentHeight: 150)
+        #expect(scrollView(in: hosting) == nil)
     }
 
     @Test func aTallViewIsCappedToTheScreen() async throws {

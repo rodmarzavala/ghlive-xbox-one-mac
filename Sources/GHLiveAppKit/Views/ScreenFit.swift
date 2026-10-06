@@ -9,7 +9,15 @@ enum ScreenFit {
     static let titleBarHeight: CGFloat = 28
     static let contentPadding: CGFloat = 20
     static let windowChrome: CGFloat = titleBarHeight + 2 * contentPadding
+    /// The smallest visible scroll area; the footprint can be smaller by the shadow allowance that bleeds past it.
     static let minimumScrollHeight: CGFloat = 240
+    /// A scroll view clips what it holds, including the shadows cards cast past their edges, so the scrolled
+    /// content gets this much room inside it, given back outside so the layout does not move.
+    static let shadowAllowance: CGFloat = 16
+    /// Between the scroll area and what follows it: wider than the allowance, so scrolled cards never reach
+    /// under the footer.
+    static let footerGap: CGFloat = 4
+    static let footerSpacing: CGFloat = shadowAllowance + footerGap
     /// Used when no screen is known, such as in a headless render.
     static let fallbackScreenHeight: CGFloat = 800
 
@@ -52,24 +60,37 @@ struct ScrollsWithinScreen<Content: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if isEnabled {
+        if isEnabled && needsScrolling {
             ScrollView(.vertical) {
-                content.background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
-                    })
+                measuring(content).padding(ScreenFit.shadowAllowance)
             }
-            .frame(height: scrollHeight)
-            .onPreferenceChange(ContentHeightKey.self) { height in
-                MainActor.assumeIsolated { measured.value = height }
-            }
+            // Its own background would show as a slightly lighter box against the window.
+            .scrollContentBackground(.hidden)
+            // The allowance bleeds past the footprint (negative padding) so card shadows are not clipped.
+            .frame(height: availableHeight + 2 * ScreenFit.shadowAllowance)
+            .padding(-ScreenFit.shadowAllowance)
         } else {
-            content
+            // No scroll view when everything fits: a scroll view clips what it holds, card shadows included.
+            measuring(content)
         }
     }
 
-    private var scrollHeight: CGFloat? {
-        guard measured.value > 0 else { return nil }
-        return ScreenFit.scrollHeight(content: measured.value, screen: screenHeight, reserved: reservedHeight)
+    private func measuring(_ view: Content) -> some View {
+        // One root, so content made of several views is measured as a whole.
+        VStack(spacing: 0) { view }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                }
+            )
+            .onPreferenceChange(ContentHeightKey.self) { height in
+                MainActor.assumeIsolated { measured.value = height }
+            }
     }
+
+    private var availableHeight: CGFloat {
+        ScreenFit.scrollHeight(content: .greatestFiniteMagnitude, screen: screenHeight, reserved: reservedHeight)
+    }
+
+    private var needsScrolling: Bool { measured.value > availableHeight }
 }
