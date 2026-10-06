@@ -63,7 +63,13 @@ struct ScrollsWithinScreenHostingTests {
         let footprint = hosting.fittingSize
         #expect(scroll.frame.width - footprint.width == 2 * ScreenFit.shadowAllowance)
         #expect(scroll.frame.height - footprint.height == 2 * ScreenFit.shadowAllowance)
+        #expect(ScreenFit.footerSpacing > ScreenFit.shadowAllowance)
         #expect(footprint.height == screen - ScreenFit.windowChrome - reserved)
+    }
+
+    @Test func aViewThatFitsIsNotWrappedInAScrollView() async throws {
+        let hosting = try await hosted(contentHeight: 150)
+        #expect(scrollView(in: hosting) == nil)
     }
 
     @Test func aTallViewIsCappedToTheScreen() async throws {

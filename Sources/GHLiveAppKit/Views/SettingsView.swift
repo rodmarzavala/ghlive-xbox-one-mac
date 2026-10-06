@@ -26,7 +26,7 @@ public struct SettingsView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: ScreenFit.footerSpacing) {
             ScrollsWithinScreen(isEnabled: limitsHeight, reservedHeight: Self.footerHeight) {
                 VStack(alignment: .leading, spacing: 14) {
                     header
