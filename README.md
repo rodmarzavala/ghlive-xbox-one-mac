@@ -89,7 +89,7 @@ In short: Clone Hero's control rows carry two names, for example **Green | Black
 
 ### Playing classic 5-fret charts
 
-Most community charts show colored 5-fret notes. They play with the default bindings above: Green/Red/Yellow are Black 1/2/3, and Blue/Orange are White 1/2. Black-and-white notes only appear in songs that have a 6-fret (GHL) chart.
+Most community charts show colored 5-fret notes. They play with the default bindings above: Green/Red/Yellow are Black 1/2/3, and Blue/Orange are White 1/2. Black-and-white notes appear in songs that have a 6-fret (GHL) chart when your Clone Hero player profile uses the 6-fret guitar instrument.
 
 If you prefer another layout, GHLive's **5-fret (classic charts)** preset puts the five lanes on keys `1` to `5`:
 
@@ -188,7 +188,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **The guitar does not sync.** Switch the guitar on once the status reads "Dongle ready".
 - **"The dongle is in use by another app".** Quit Steam, or any other app that reads Xbox controllers. GHLive retries every few seconds.
 - **A control never gets its check in "Test my guitar".** The Input Monitor does not see it: see [Check that your guitar works](#check-that-your-guitar-works) and [docs/troubleshooting.md](docs/troubleshooting.md#a-control-fails-the-guitar-test).
-- **I only see colored notes, not black and white.** Most likely, that song has no 6-fret (GHL) chart, or the 6-fret instrument isn't selected: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
+- **I only see colored notes, not black and white.** Change your Clone Hero player profile's instrument to the 6-fret guitar; the song also needs a 6-fret (GHL) chart: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.

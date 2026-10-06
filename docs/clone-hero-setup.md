@@ -40,9 +40,9 @@ Clone Hero ships without songs; the community makes them ("custom charts").
 
 ## 4. 6-fret charts vs. 5-fret charts
 
-Your guitar's notes are **black and white**. They only appear on screen in songs that include a **6-fret (GHL) chart**, and only when you pick the 6-fret guitar instrument for that song. Most community charts are made for the classic 5-button guitar and show **colored** notes instead.
+Your guitar's notes are **black and white**. They only appear on screen in songs that include a **6-fret (GHL) chart**, and only when your player profile uses the **6-fret guitar** instrument. Most community charts are made for the classic 5-button guitar and show **colored** notes instead.
 
-- **6-fret charts:** pick the 6-fret (GHL) guitar instrument when choosing the song. If a song should have one but the instrument isn't offered, rescan. The chart itself must contain a 6-fret part (an `[ExpertGHLGuitar]` section in `notes.chart`, or a `PART GUITAR GHL` track in `notes.mid`).
+- **6-fret charts:** in Clone Hero, **change your player profile's instrument to the 6-fret guitar**. This is the step that makes black-and-white notes appear (verified on a real setup); with a 5-fret instrument the game shows colored notes even when the song has a 6-fret chart. If a song still doesn't offer a 6-fret part, rescan. The chart itself must contain a 6-fret part (an `[ExpertGHLGuitar]` section in `notes.chart`, or a `PART GUITAR GHL` track in `notes.mid`).
 - **5-fret charts:** they play with the same bindings. The rows above pair Green/Red/Yellow with Black 1/2/3, and Blue/Orange with White 1/2. Prefer another layout? GHLive's **5-fret (classic charts)** preset is an alternative ([details](../README.md#playing-classic-5-fret-charts)). Choose it in GHLive's Settings, then re-bind Clone Hero's five colored rows with the preset's keys: for **Green**, **Red**, **Yellow**, **Blue** and **Orange**, press White 1, White 2, White 3, Black 2 and Black 3 on the guitar (keys `1` to `5`). Ignore the Black/White name on each row while this preset is active. Switch back to the 6-fret preset and re-bind before playing 6-fret charts.
 
 ## 5. Play
