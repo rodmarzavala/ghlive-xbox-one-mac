@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.1.0-beta.4] - 2026-10-06
+
 ### Added
 
 - A step-by-step [Clone Hero setup guide](docs/clone-hero-setup.md): bindings, adding songs, and 6-fret vs. 5-fret charts.
