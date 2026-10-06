@@ -67,6 +67,20 @@ struct ScrollsWithinScreenHostingTests {
         #expect(footprint.height == screen - ScreenFit.windowChrome - reserved)
     }
 
+    private var available: CGFloat { screen - ScreenFit.windowChrome - reserved }
+
+    @Test func contentExactlyAsTallAsTheSpaceDoesNotScroll() async throws {
+        let hosting = try await hosted(contentHeight: available)
+        #expect(scrollView(in: hosting) == nil)
+        #expect(hosting.fittingSize.height == available)
+    }
+
+    @Test func onePointMoreScrollsAndKeepsTheFootprint() async throws {
+        let hosting = try await hosted(contentHeight: available + 1)
+        #expect(scrollView(in: hosting) != nil)
+        #expect(hosting.fittingSize.height == available)
+    }
+
     @Test func aViewThatFitsIsNotWrappedInAScrollView() async throws {
         let hosting = try await hosted(contentHeight: 150)
         #expect(scrollView(in: hosting) == nil)

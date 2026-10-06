@@ -76,7 +76,8 @@ struct ScrollsWithinScreen<Content: View>: View {
     }
 
     private func measuring(_ view: Content) -> some View {
-        view
+        // One root, so content made of several views is measured as a whole.
+        VStack(spacing: 0) { view }
             .background(
                 GeometryReader { proxy in
                     Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
