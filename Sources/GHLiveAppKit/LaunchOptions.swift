@@ -4,7 +4,6 @@ import Foundation
 public enum AppWindow: String, CaseIterable, Sendable {
     case settings
     case monitor
-    case charts
 }
 
 public enum LaunchOptions: Equatable, Sendable {

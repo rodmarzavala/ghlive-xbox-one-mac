@@ -89,44 +89,6 @@ struct ArgumentsTests {
         }
     }
 
-    @Test("charts add-ghl takes a folder and an optional --dry-run")
-    func chartsAddGHL() throws {
-        #expect(
-            try parseArguments(["charts", "add-ghl", "/songs"])
-                == .addGHLTracks(AddGHLOptions(folder: "/songs", dryRun: false)))
-        #expect(
-            try parseArguments(["charts", "add-ghl", "/songs", "--dry-run"])
-                == .addGHLTracks(AddGHLOptions(folder: "/songs", dryRun: true)))
-        #expect(
-            try parseArguments(["charts", "add-ghl", "--dry-run", "My Songs"])
-                == .addGHLTracks(AddGHLOptions(folder: "My Songs", dryRun: true)))
-    }
-
-    @Test("charts add-ghl rejects a missing folder, extra folders, unknown options and unknown subcommands")
-    func chartsAddGHLErrors() {
-        #expect(throws: ArgumentError.missingValue("charts add-ghl <folder>")) {
-            try parseArguments(["charts", "add-ghl"])
-        }
-        #expect(throws: ArgumentError.missingValue("charts add-ghl <folder>")) {
-            try parseArguments(["charts", "add-ghl", "--dry-run"])
-        }
-        #expect(throws: ArgumentError.unknownOption("--turbo", command: "charts add-ghl")) {
-            try parseArguments(["charts", "add-ghl", "/songs", "--turbo"])
-        }
-        #expect(throws: ArgumentError.unknownOption("/other", command: "charts add-ghl")) {
-            try parseArguments(["charts", "add-ghl", "/songs", "/other"])
-        }
-        #expect(throws: ArgumentError.unknownCommand("charts remove")) {
-            try parseArguments(["charts", "remove"])
-        }
-        #expect(throws: ArgumentError.missingValue("charts add-ghl")) { try parseArguments(["charts"]) }
-    }
-
-    @Test("the usage text documents charts add-ghl")
-    func usageMentionsCharts() {
-        #expect(usage.contains("charts add-ghl <folder> [--dry-run]"))
-    }
-
     @Test("version and help")
     func versionAndHelp() throws {
         #expect(try parseArguments(["--version"]) == .version)
