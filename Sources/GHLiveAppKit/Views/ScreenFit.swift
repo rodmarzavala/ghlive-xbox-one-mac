@@ -10,6 +10,9 @@ enum ScreenFit {
     static let contentPadding: CGFloat = 20
     static let windowChrome: CGFloat = titleBarHeight + 2 * contentPadding
     static let minimumScrollHeight: CGFloat = 240
+    /// A scroll view clips what it holds, including the shadows cards cast past their edges, so the scrolled
+    /// content gets this much room inside it, given back outside so the layout does not move.
+    static let shadowAllowance: CGFloat = 16
     /// Used when no screen is known, such as in a headless render.
     static let fallbackScreenHeight: CGFloat = 800
 
@@ -54,12 +57,17 @@ struct ScrollsWithinScreen<Content: View>: View {
     var body: some View {
         if isEnabled {
             ScrollView(.vertical) {
-                content.background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
-                    })
+                content
+                    .padding(ScreenFit.shadowAllowance)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                        })
             }
+            // Its own background would show as a slightly lighter box against the window.
+            .scrollContentBackground(.hidden)
             .frame(height: scrollHeight)
+            .padding(-ScreenFit.shadowAllowance)
             .onPreferenceChange(ContentHeightKey.self) { height in
                 MainActor.assumeIsolated { measured.value = height }
             }
@@ -70,6 +78,9 @@ struct ScrollsWithinScreen<Content: View>: View {
 
     private var scrollHeight: CGFloat? {
         guard measured.value > 0 else { return nil }
-        return ScreenFit.scrollHeight(content: measured.value, screen: screenHeight, reserved: reservedHeight)
+        // The allowance sits outside the window's footprint (negative padding), so the cap may grow by it.
+        let allowance = 2 * ScreenFit.shadowAllowance
+        return ScreenFit.scrollHeight(
+            content: measured.value, screen: screenHeight + allowance, reserved: reservedHeight)
     }
 }
