@@ -32,6 +32,28 @@ public enum TerminationTrigger: String, Sendable {
     case signal
 }
 
+/// Why something failed, in a form that is safe to publish: a `DongleError` has fixed texts, any other
+/// error is named by its type only, because its description could carry anything.
+public enum FailureReason: Hashable, Sendable, CustomStringConvertible {
+    case dongle(DongleError)
+    case other(typeName: String)
+
+    public init(_ error: Error) {
+        if let dongleError = error as? DongleError {
+            self = .dongle(dongleError)
+        } else {
+            self = .other(typeName: String(describing: type(of: error)))
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .dongle(let error): error.localizedDescription
+        case .other(let typeName): "unexpected error (\(typeName))"
+        }
+    }
+}
+
 /// Everything GHLive reports to the system log. It deliberately has no payload that names a key, a control
 /// or a report value, so the log can never become a keystroke record: only events, counts and failure texts.
 public enum LogEvent: Hashable, Sendable {
@@ -39,10 +61,10 @@ public enum LogEvent: Hashable, Sendable {
     case dongleArrived
     case dongleRemoved
     case dongleBusy
-    case connectFailed(String)
-    case readFailed(String)
-    case writeFailed(String)
-    case keepAliveFailed(String)
+    case connectFailed(FailureReason)
+    case readFailed(FailureReason)
+    case writeFailed(FailureReason)
+    case keepAliveFailed(FailureReason)
     case guitarSilent
     case inputReleased(count: Int, reason: ReleaseReason)
     case paused
@@ -98,10 +120,10 @@ public enum LogEvent: Hashable, Sendable {
         case .dongleArrived: "dongle arrived"
         case .dongleRemoved: "dongle removed"
         case .dongleBusy: "dongle is busy: \(DongleError.exclusiveAccess.localizedDescription)"
-        case .connectFailed(let reason): "cannot connect to the dongle: \(reason)"
-        case .readFailed(let reason): "dongle read failed: \(reason)"
-        case .writeFailed(let reason): "dongle write failed: \(reason)"
-        case .keepAliveFailed(let reason): "keep-alive failed: \(reason)"
+        case .connectFailed(let reason): "cannot connect to the dongle: \(reason.description)"
+        case .readFailed(let reason): "dongle read failed: \(reason.description)"
+        case .writeFailed(let reason): "dongle write failed: \(reason.description)"
+        case .keepAliveFailed(let reason): "keep-alive failed: \(reason.description)"
         case .guitarSilent: "guitar went silent"
         case .inputReleased(let count, let reason): "released \(count) held key(s): \(reason.rawValue)"
         case .paused: "input paused"

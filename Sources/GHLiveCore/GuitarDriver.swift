@@ -215,7 +215,7 @@ public final class GuitarDriver: ObservableObject {
             } catch {
                 // Closing the transport on cancellation makes the pending write throw; that is not a fault.
                 if Task.isCancelled { break }
-                setStatus(.error(error.localizedDescription))
+                setFailedStatus(error)
             }
             releaseInput(because: .disconnect)
             guard (try? await Task.sleep(for: timing.retryDelay)) != nil else { break }
@@ -231,7 +231,7 @@ public final class GuitarDriver: ObservableObject {
             return transport
         } catch {
             report(error) { reason in
-                (error as? DongleError) == .exclusiveAccess ? .dongleBusy : .connectFailed(reason)
+                reason == .dongle(.exclusiveAccess) ? .dongleBusy : .connectFailed(reason)
             }
             throw error
         }
@@ -315,7 +315,7 @@ public final class GuitarDriver: ObservableObject {
     }
 
     private func send(
-        _ packets: [GipPacket], over transport: any PacketTransport, failure: (String) -> LogEvent
+        _ packets: [GipPacket], over transport: any PacketTransport, failure: (FailureReason) -> LogEvent
     ) async throws {
         for packet in packets {
             do {
@@ -368,10 +368,15 @@ public final class GuitarDriver: ObservableObject {
         eventLog.record(.inputReleased(count: sink.releaseAll(), reason: reason))
     }
 
-    private func setStatus(_ newStatus: DriverStatus) {
+    private func setStatus(_ newStatus: DriverStatus, loggedAs loggedStatus: DriverStatus? = nil) {
         guard status != newStatus else { return }
         status = newStatus
-        recordStatus(newStatus)
+        recordStatus(loggedStatus ?? newStatus)
+    }
+
+    /// The menu shows the error's own text; the log gets the publishable description of it.
+    private func setFailedStatus(_ error: Error) {
+        setStatus(.error(error.localizedDescription), loggedAs: .error(FailureReason(error).description))
     }
 
     /// A dongle that stays busy, or takes the handshake and then fails, cycles through connecting, ready and
@@ -398,8 +403,8 @@ public final class GuitarDriver: ObservableObject {
     }
 
     /// A failure while shutting down is not a fault: closing the transport is what makes pending I/O throw.
-    private func report(_ error: Error, as event: (String) -> LogEvent) {
+    private func report(_ error: Error, as event: (FailureReason) -> LogEvent) {
         guard !Task.isCancelled, !(error is CancellationError) else { return }
-        recordOnce(event(error.localizedDescription))
+        recordOnce(event(FailureReason(error)))
     }
 }

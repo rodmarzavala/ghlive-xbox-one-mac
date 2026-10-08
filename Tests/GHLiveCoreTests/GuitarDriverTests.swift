@@ -460,6 +460,11 @@ struct GuitarDriverTests {
     }
 }
 
+private struct UnexpectedFailure: LocalizedError {
+    static let secret = "unexpected-failure-text-with-user-data"
+    var errorDescription: String? { Self.secret }
+}
+
 private func isReadFailure(_ event: LogEvent) -> Bool {
     if case .readFailed = event { return true }
     return false
@@ -526,7 +531,7 @@ struct GuitarDriverEventLogTests {
             harness.meaningfulEvents == [
                 .dongleArrived, status(.connecting), .dongleBusy,
                 status(.error(DongleError.exclusiveAccess.localizedDescription)),
-                .connectFailed(noGipText), status(.error(noGipText)), status(.dongleReady),
+                .connectFailed(.dongle(.noGipInterface)), status(.error(noGipText)), status(.dongleReady),
             ])
         await harness.driver.stop()
     }
@@ -579,7 +584,7 @@ struct GuitarDriverEventLogTests {
         #expect(
             harness.meaningfulEvents == [
                 .dongleArrived, status(.connecting), status(.dongleReady),
-                .readFailed(failure.localizedDescription), status(.error(failure.localizedDescription)),
+                .readFailed(.dongle(failure)), status(.error(failure.localizedDescription)),
                 status(.waitingForDongle),
             ])
     }
@@ -589,7 +594,7 @@ struct GuitarDriverEventLogTests {
         let harness = Harness(connector: FakeConnector([.failure(DongleError.noGipInterface)]))
         harness.driver.start()
         harness.monitor.send(.arrived)
-        let expected = LogEvent.connectFailed(DongleError.noGipInterface.localizedDescription)
+        let expected = LogEvent.connectFailed(.dongle(.noGipInterface))
         #expect(await eventually { harness.events.events.contains(expected) })
         await harness.driver.stop()
     }
@@ -650,7 +655,7 @@ struct GuitarDriverEventLogTests {
         first.fail(failure)
         #expect(await eventually { second.written.count == 4 })
 
-        let reads = harness.events.events.filter { $0 == .readFailed(failure.localizedDescription) }
+        let reads = harness.events.events.filter { $0 == .readFailed(.dongle(failure)) }
         #expect(reads.count == 1)
         #expect(!harness.events.events.contains { if case .writeFailed = $0 { true } else { false } })
         await harness.driver.stop()
@@ -663,7 +668,7 @@ struct GuitarDriverEventLogTests {
         let harness = Harness(connector: FakeConnector([.success(first)]))
         harness.driver.start()
         harness.monitor.send(.arrived)
-        let expected = LogEvent.writeFailed(DongleError.disconnected.localizedDescription)
+        let expected = LogEvent.writeFailed(.dongle(.disconnected))
         #expect(await eventually { harness.events.events.contains(expected) })
         #expect(!harness.events.events.contains { if case .readFailed = $0 { true } else { false } })
         await harness.driver.stop()
@@ -680,7 +685,7 @@ struct GuitarDriverEventLogTests {
         harness.clock.advance(by: GipSession.keepAliveInterval + 0.1)
 
         #expect(await eventually { second.written.count == 4 })
-        #expect(harness.events.events.contains(.keepAliveFailed(failure.localizedDescription)))
+        #expect(harness.events.events.contains(.keepAliveFailed(.dongle(failure))))
         await harness.driver.stop()
     }
 
@@ -715,6 +720,26 @@ struct GuitarDriverEventLogTests {
             }
             for name in KeyCode.allNames where name.count > 1 {
                 #expect(!event.message.contains(name), "\(event.message)")
+            }
+        }
+    }
+
+    @Test("the text of an unexpected error and the bytes of a report never reach the log")
+    func noArbitraryTextInTheLog() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        let payload = report([fretOffset: fretBlack1, tiltOffset: raisedTilt, whammyOffset: 0xFF])
+        transport.feed(guitarMessage(payload))
+        #expect(await eventually { harness.driver.status == .guitarActive })
+        transport.fail(UnexpectedFailure())
+        #expect(await eventually { harness.events.events.contains(where: isReadFailure) })
+        await harness.driver.stop()
+
+        let forbidden = [UnexpectedFailure.secret, payload.hexString, guitarMessage(payload).hexString]
+        for event in harness.events.events {
+            for text in forbidden {
+                #expect(!event.message.contains(text), "\(event.message)")
             }
         }
     }

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import USBTransport
 
 @testable import GHLiveCore
 
@@ -28,10 +29,10 @@ struct EventLogTests {
         #expect(LogEvent.driverStatus(.error("x")).level == .error)
         #expect(LogEvent.dongleArrived.level == .notice)
         #expect(LogEvent.dongleBusy.level == .error)
-        #expect(LogEvent.connectFailed("x").level == .error)
-        #expect(LogEvent.readFailed("x").level == .error)
-        #expect(LogEvent.writeFailed("x").level == .error)
-        #expect(LogEvent.keepAliveFailed("x").level == .error)
+        #expect(LogEvent.connectFailed(.other(typeName: "X")).level == .error)
+        #expect(LogEvent.readFailed(.other(typeName: "X")).level == .error)
+        #expect(LogEvent.writeFailed(.other(typeName: "X")).level == .error)
+        #expect(LogEvent.keepAliveFailed(.other(typeName: "X")).level == .error)
         #expect(LogEvent.keymapLoadFailed.level == .error)
         #expect(LogEvent.terminationTimedOut.level == .fault)
         #expect(LogEvent.inputReleased(count: 1, reason: .pause).level == .notice)
@@ -54,6 +55,14 @@ struct EventLogTests {
         #expect(LogEvent.dongleRemoved.category == .usb)
         #expect(LogEvent.inputReleased(count: 1, reason: .stop).category == .output)
         #expect(LogEvent.launched(version: "1").category == .app)
+    }
+
+    @Test("a failure reason keeps a dongle error's fixed text and names any other error by its type only")
+    func failureReasons() {
+        struct Leaky: LocalizedError { var errorDescription: String? { "private details" } }
+        #expect(FailureReason(DongleError.noGipInterface) == .dongle(.noGipInterface))
+        #expect(FailureReason(Leaky()) == .other(typeName: "Leaky"))
+        #expect(FailureReason(Leaky()).description == "unexpected error (Leaky)")
     }
 
     @Test("the busy dongle message says what to do")
