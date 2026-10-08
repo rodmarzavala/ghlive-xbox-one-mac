@@ -38,7 +38,10 @@ let package = Package(
             dependencies: ["GHLiveCore", "GIPProtocol", "GuitarInput", "KeyMapping", "KeyboardOutput", "USBTransport"]
         ),
         .testTarget(name: "USBTransportTests", dependencies: ["USBTransport"]),
-        .testTarget(name: "GHLiveCLITests", dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput"]),
+        .testTarget(
+            name: "GHLiveCLITests",
+            dependencies: ["GHLiveCLI", "GHLiveCore", "GuitarInput", "KeyboardOutput", "USBTransport"]
+        ),
         .testTarget(
             name: "GHLiveAppKitTests",
             dependencies: [

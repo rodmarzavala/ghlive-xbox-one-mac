@@ -6,8 +6,9 @@ import KeyMapping
 @MainActor
 public protocol OutputSink: AnyObject {
     func apply(state: GuitarState, controls: Set<Control>)
-    /// Must leave nothing held. Called on stop, disconnect and pause.
-    func releaseAll()
+    /// Must leave nothing held. Called on stop, disconnect and pause. Returns how many keys it lifted.
+    @discardableResult
+    func releaseAll() -> Int
 }
 
 /// Posts one keyboard event. The seam that keeps `KeyboardSink` testable without a window server.
@@ -34,8 +35,11 @@ public final class KeyboardSink: OutputSink {
         move(to: Set(controls.compactMap { bindings[$0] }))
     }
 
-    public func releaseAll() {
+    @discardableResult
+    public func releaseAll() -> Int {
+        let held = pressedKeys.count
         move(to: [])
+        return held
     }
 
     // A key is recorded as pressed before its key down is posted and forgotten only after its key up, so

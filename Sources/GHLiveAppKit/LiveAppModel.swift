@@ -19,9 +19,10 @@ extension AppModel {
         let store = KeymapStore.standard
         let loaded = loadKeymap(from: store)
         let emitter: any KeyEmitter = isDryRun ? DryRunKeyEmitter(write: writeToStandardError) : CGEventKeyEmitter()
+        let eventLog = OSLogEventLog()
         let accessibility: any AccessibilityChecking = isDryRun ? NoAccessibilityNeeded() : SystemAccessibility()
         return AppModel(
-            driver: GuitarDriver.live(keymap: loaded.keymap, emitter: emitter),
+            driver: GuitarDriver.live(keymap: loaded.keymap, emitter: emitter, eventLog: eventLog),
             emitter: emitter,
             keymap: loaded.keymap,
             store: store,
@@ -29,7 +30,8 @@ extension AppModel {
             keymapProblem: loaded.problem,
             accessibility: accessibility,
             launchAtLogin: SystemLaunchAtLogin(),
-            openURL: { NSWorkspace.shared.open($0) }
+            openURL: { NSWorkspace.shared.open($0) },
+            eventLog: eventLog
         )
     }
 

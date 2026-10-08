@@ -191,6 +191,7 @@ Short version. Full guide: [docs/troubleshooting.md](docs/troubleshooting.md).
 - **I only see colored notes, not black and white.** Change your Clone Hero player profile's instrument to the 6-fret guitar; the song also needs a 6-fret (GHL) chart: see [6-fret charts vs. 5-fret charts](docs/clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 - **Keys do not reach the game.** Click "Grant Accessibility access..." in the menu and keep the game window focused.
 - **It stopped working after an update.** Remove GHLive from the Accessibility list and add it again.
+- **Reporting a problem that happened earlier.** GHLive logs events, never your keys: see [Collecting logs](docs/troubleshooting.md#collecting-logs).
 - **Intel Macs.** The build is universal and includes an Intel slice, but it has not been tested on an Intel Mac. Please report what you find.
 
 ## FAQ

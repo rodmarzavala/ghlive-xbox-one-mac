@@ -91,16 +91,19 @@ private func run(_ options: RunOptions) async -> Int32 {
     let log: @Sendable (String) -> Void = { text in
         if options.verbose { printLine(text) }
     }
-    let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log)
+    let latestStatus = LatestStatus()
+    let eventLog = makeEventLog(
+        verbose: options.verbose, failures: StderrFailureLog(latestStatus: latestStatus, write: printError),
+        write: printLine)
+    let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log, eventLog: eventLog)
     let subscription = options.verbose ? reportInput(of: driver) : nil
-    let errorReports = driver.$status.removeDuplicates().compactMap(StatusReporter.line(for:)).sink(
-        receiveValue: printError)
+    let statusFollower = driver.$status.sink { latestStatus.value = $0 }
     driver.start()
     printLine("waiting for the dongle (Ctrl-C to quit)")
     await waitForTerminationSignal()
     await driver.stop()
     subscription?.cancel()
-    errorReports.cancel()
+    statusFollower.cancel()
     return ExitCode.success
 }
 
@@ -124,6 +127,7 @@ private func sniff() async -> Int32 {
         connector: DongleConnector(),
         sink: DiscardingSink(),
         log: printLine,
+        eventLog: makeEventLog(verbose: true, failures: nil, write: printLine),
         packetObserver: { direction, packet in
             let label = direction == .received ? "rx" : "tx"
             let name = packet.knownCommand.map { "\($0)" } ?? "unknown"
@@ -140,7 +144,7 @@ private func sniff() async -> Int32 {
 @MainActor
 private final class DiscardingSink: OutputSink {
     func apply(state: GuitarState, controls: Set<Control>) {}
-    func releaseAll() {}
+    func releaseAll() -> Int { 0 }
 }
 
 /// Suspends until SIGINT, SIGTERM or SIGHUP arrives. The default dispositions are replaced so the process
