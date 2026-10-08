@@ -22,8 +22,10 @@ struct TextEventLogTests {
     func verboseWritesToTheTerminal() {
         let lines = Lines()
         let system = RecordingEventLog()
-        makeEventLog(verbose: true, system: system) { lines.all.append($0) }.record(.dongleArrived)
-        makeEventLog(verbose: false, system: system) { lines.all.append($0) }.record(.dongleRemoved)
+        makeEventLog(verbose: true, system: system, reportError: { _ in }) { lines.all.append($0) }.record(
+            .dongleArrived)
+        makeEventLog(verbose: false, system: system, reportError: { _ in }) { lines.all.append($0) }.record(
+            .dongleRemoved)
         #expect(lines.all == ["dongle arrived"])
         #expect(system.events == [.dongleArrived, .dongleRemoved])
     }
