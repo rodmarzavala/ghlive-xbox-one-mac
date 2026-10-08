@@ -27,7 +27,10 @@ final class ProbeSink: OutputSink {
     private(set) var releaseCount = 0
 
     func apply(state: GuitarState, controls: Set<Control>) {}
-    func releaseAll() { releaseCount += 1 }
+    func releaseAll() -> Int {
+        releaseCount += 1
+        return 0
+    }
 }
 
 @MainActor

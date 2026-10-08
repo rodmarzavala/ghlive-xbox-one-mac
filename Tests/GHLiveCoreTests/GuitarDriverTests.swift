@@ -22,6 +22,7 @@ private final class Harness {
     let monitor = FakeMonitor()
     let emitter = RecordingEmitter()
     let clock = FakeClock()
+    let events = RecordingEventLog()
     let driver: GuitarDriver
     let connector: FakeConnector
 
@@ -38,8 +39,17 @@ private final class Harness {
             sink: sink,
             thresholds: Keymap.default.thresholds,
             timing: timing,
-            now: { clock.now() }
+            now: { clock.now() },
+            eventLog: events
         )
+    }
+
+    /// The events without the zero-key releases, which every teardown path emits and which say nothing.
+    var meaningfulEvents: [LogEvent] {
+        events.events.filter {
+            if case .inputReleased(let count, _) = $0 { return count > 0 }
+            return true
+        }
     }
 
     static var fastTiming: GuitarDriver.Timing {
@@ -447,5 +457,198 @@ struct GuitarDriverTests {
         }
         await harness.driver.stop()
         #expect(!statuses.contains { if case .error = $0 { true } else { false } })
+    }
+}
+
+@MainActor
+@Suite("Guitar driver event log", .serialized)
+struct GuitarDriverEventLogTests {
+    private func status(_ status: DriverStatus) -> LogEvent { .driverStatus(status) }
+
+    @Test("arrival, ready, active, silence and removal leave a trail with the released key count")
+    func fullLifecycle() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        transport.feed(guitarMessage(report([fretOffset: fretBlack1])))
+        #expect(await eventually { harness.driver.status == .guitarActive })
+
+        harness.clock.advance(by: Harness.fastTiming.guitarTimeout + 0.5)
+        #expect(await eventually { harness.driver.status == .dongleReady })
+        transport.feed(guitarMessage(report([fretOffset: fretBlack1])))
+        #expect(await eventually { harness.driver.status == .guitarActive })
+        harness.monitor.send(.removed)
+        #expect(await eventually { harness.driver.status == .waitingForDongle })
+
+        #expect(
+            harness.meaningfulEvents == [
+                .dongleArrived, status(.connecting), status(.dongleReady), status(.guitarActive),
+                .guitarSilent, .inputReleased(count: 1, reason: .silence), status(.dongleReady),
+                status(.guitarActive),
+                .dongleRemoved, .inputReleased(count: 1, reason: .disconnect), status(.waitingForDongle),
+            ])
+        await harness.driver.stop()
+    }
+
+    @Test("a busy dongle is logged once, not on every retry")
+    func busyDongleIsDeduplicated() async {
+        let transport = FakeTransport()
+        let busy: Result<FakeTransport, Error> = .failure(DongleError.exclusiveAccess)
+        let harness = Harness(connector: FakeConnector([busy, busy, busy, .success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        #expect(await eventually { harness.driver.status == .dongleReady })
+
+        #expect(harness.connector.attempts == 4)
+        #expect(
+            harness.meaningfulEvents == [
+                .dongleArrived, status(.connecting), .dongleBusy,
+                status(.error(DongleError.exclusiveAccess.localizedDescription)), status(.dongleReady),
+            ])
+        await harness.driver.stop()
+    }
+
+    @Test("another connect failure is logged with its description")
+    func connectFailure() async {
+        let harness = Harness(connector: FakeConnector([.failure(DongleError.noGipInterface)]))
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        let expected = LogEvent.connectFailed(DongleError.noGipInterface.localizedDescription)
+        #expect(await eventually { harness.events.events.contains(expected) })
+        await harness.driver.stop()
+    }
+
+    @Test("pause, resume and stop log the reason and the count of keys they released")
+    func pauseResumeStop() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        let held = guitarMessage(report([fretOffset: fretBlack1]))
+        transport.feed(held)
+        #expect(await eventually { harness.emitter.events == [.down(key("1"))] })
+
+        harness.driver.pause()
+        harness.driver.pause()
+        harness.driver.resume()
+        harness.driver.resume()
+        transport.feed(held)
+        #expect(await eventually { harness.emitter.events.count == 3 })
+        await harness.driver.stop()
+
+        let lifecycle = harness.meaningfulEvents.filter {
+            switch $0 {
+            case .paused, .resumed, .inputReleased: true
+            default: false
+            }
+        }
+        #expect(
+            lifecycle == [
+                .paused, .inputReleased(count: 1, reason: .pause), .resumed,
+                .inputReleased(count: 1, reason: .stop),
+            ])
+    }
+
+    @Test("pausing to quit and reconfiguring are told apart from a user pause")
+    func quitAndReconfigureReasons() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        transport.feed(guitarMessage(report([fretOffset: fretBlack1])))
+        #expect(await eventually { harness.emitter.events == [.down(key("1"))] })
+        harness.driver.reconfigure(
+            sink: KeyboardSink(keymap: .default, emitter: RecordingEmitter()), thresholds: Keymap.default.thresholds)
+        harness.driver.pause(reason: .quit)
+
+        #expect(harness.events.events.contains(.inputReleased(count: 1, reason: .reconfigure)))
+        #expect(harness.events.events.contains(.inputReleased(count: 0, reason: .quit)))
+        await harness.driver.stop()
+    }
+
+    @Test("a read failure is logged once")
+    func readFailure() async {
+        let first = FakeTransport()
+        let second = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(first), .success(second)]))
+        await harness.arrive(waitingFor: first)
+        let failure = DongleError.ioFailure(operation: "read", code: kIOReturnBadArgument)
+        first.fail(failure)
+        #expect(await eventually { second.written.count == 4 })
+
+        let reads = harness.events.events.filter { $0 == .readFailed(failure.localizedDescription) }
+        #expect(reads.count == 1)
+        #expect(!harness.events.events.contains { if case .writeFailed = $0 { true } else { false } })
+        await harness.driver.stop()
+    }
+
+    @Test("a failed handshake write is a write failure")
+    func writeFailure() async {
+        let first = FakeTransport()
+        first.failWrites(from: 1)
+        let harness = Harness(connector: FakeConnector([.success(first)]))
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        let expected = LogEvent.writeFailed(DongleError.disconnected.localizedDescription)
+        #expect(await eventually { harness.events.events.contains(expected) })
+        await harness.driver.stop()
+    }
+
+    @Test("a failed keep-alive is logged as a keep-alive failure")
+    func keepAliveFailure() async {
+        let first = FakeTransport()
+        let second = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(first), .success(second)]))
+        await harness.arrive(waitingFor: first)
+        let failure = DongleError.ioFailure(operation: "write", code: kIOReturnBadArgument)
+        first.failWrites(from: 0, with: failure)
+        harness.clock.advance(by: GipSession.keepAliveInterval + 0.1)
+
+        #expect(await eventually { second.written.count == 4 })
+        #expect(harness.events.events.contains(.keepAliveFailed(failure.localizedDescription)))
+        await harness.driver.stop()
+    }
+
+    @Test("a deliberate stop logs no failure")
+    func stopLogsNoFailure() async {
+        let transport = FakeTransport()
+        transport.stallWrites()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        #expect(await eventually { transport.stalledWriteCount == 1 })
+        await harness.driver.stop()
+        #expect(harness.events.events.allSatisfy { $0.level != .error && $0.level != .fault })
+    }
+
+    @Test("no event names a key, a control or a report value")
+    func eventsCarryNoInputIdentity() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        transport.feed(guitarMessage(report([fretOffset: fretBlack1, tiltOffset: raisedTilt, whammyOffset: 0xFF])))
+        #expect(await eventually { harness.emitter.events.count == 3 })
+        harness.driver.pause()
+        await harness.driver.stop()
+
+        let events = harness.events.events
+        #expect(!events.isEmpty)
+        for event in events {
+            assertCarriesOnlyCountsAndText(event)
+            for control in Control.allCases where control != .pause {
+                #expect(!event.message.contains(control.rawValue), "\(event.message)")
+            }
+            for name in KeyCode.allNames where name.count > 1 {
+                #expect(!event.message.contains(name), "\(event.message)")
+            }
+        }
+    }
+
+    private func assertCarriesOnlyCountsAndText(_ value: Any) {
+        for child in Mirror(reflecting: value).children {
+            switch child.value {
+            case is Control, is KeyCode, is Set<Control>, is GuitarState, is GuitarSnapshot:
+                Issue.record("event payload carries input: \(type(of: child.value))")
+            default:
+                assertCarriesOnlyCountsAndText(child.value)
+            }
+        }
     }
 }

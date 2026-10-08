@@ -140,7 +140,7 @@ private func sniff() async -> Int32 {
 @MainActor
 private final class DiscardingSink: OutputSink {
     func apply(state: GuitarState, controls: Set<Control>) {}
-    func releaseAll() {}
+    func releaseAll() -> Int { 0 }
 }
 
 /// Suspends until SIGINT, SIGTERM or SIGHUP arrives. The default dispositions are replaced so the process

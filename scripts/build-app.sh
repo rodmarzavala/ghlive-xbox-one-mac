@@ -7,7 +7,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
-BUNDLE_ID="io.github.rodmarzavala.ghlive"
+# One source of truth: the unified-log subsystem in the code is the bundle id of the app.
+BUNDLE_ID="$(sed -n 's/.*bundleIdentifier = "\(.*\)".*/\1/p' Sources/GHLiveCore/GHLiveInfo.swift)"
+if [[ -z "$BUNDLE_ID" ]]; then
+    echo "error: no bundleIdentifier in Sources/GHLiveCore/GHLiveInfo.swift" >&2
+    exit 1
+fi
 MIN_MACOS="13.0"
 DIST="$ROOT/dist"
 APP="$DIST/GHLive.app"

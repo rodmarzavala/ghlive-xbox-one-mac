@@ -6,7 +6,7 @@ import KeyMapping
 import KeyboardOutput
 import USBTransport
 
-public enum DriverStatus: Equatable, Sendable {
+public enum DriverStatus: Hashable, Sendable {
     case waitingForDongle
     case connecting
     /// Handshake sent; no guitar report seen yet (the guitar may be off or out of range).
@@ -14,6 +14,18 @@ public enum DriverStatus: Equatable, Sendable {
     /// A guitar report arrived less than `Timing.guitarTimeout` ago.
     case guitarActive
     case error(String)
+}
+
+extension DriverStatus: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .waitingForDongle: "waiting for the dongle"
+        case .connecting: "connecting"
+        case .dongleReady: "dongle ready, no guitar report yet"
+        case .guitarActive: "guitar active"
+        case .error(let message): "error: \(message)"
+        }
+    }
 }
 
 /// The latest guitar report and the controls it activates, for an input monitor.
@@ -64,6 +76,7 @@ public final class GuitarDriver: ObservableObject {
     private let timing: Timing
     private let now: @Sendable () -> TimeInterval
     private let log: @Sendable (String) -> Void
+    private let eventLog: any EventLog
     private let packetObserver: (PacketDirection, GipPacket) -> Void
 
     private var sink: any OutputSink
@@ -72,6 +85,8 @@ public final class GuitarDriver: ObservableObject {
     private var lastReportAt: TimeInterval?
     private var hasWarnedAboutReports = false
     private var runTask: Task<Void, Never>?
+    /// Failures already logged since the last healthy state, so a retry loop logs each one once.
+    private var reportedFailures: Set<LogEvent> = []
 
     public init(
         monitor: any DongleEventSource,
@@ -81,6 +96,7 @@ public final class GuitarDriver: ObservableObject {
         timing: Timing = Timing(),
         now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         log: @escaping @Sendable (String) -> Void = { _ in },
+        eventLog: any EventLog = NullEventLog(),
         packetObserver: @escaping (PacketDirection, GipPacket) -> Void = { _, _ in }
     ) {
         self.monitor = monitor
@@ -90,6 +106,7 @@ public final class GuitarDriver: ObservableObject {
         self.timing = timing
         self.now = now
         self.log = log
+        self.eventLog = eventLog
         self.packetObserver = packetObserver
     }
 
@@ -98,6 +115,7 @@ public final class GuitarDriver: ObservableObject {
         keymap: Keymap,
         emitter: any KeyEmitter,
         log: @escaping @Sendable (String) -> Void = { _ in },
+        eventLog: any EventLog = NullEventLog(),
         packetObserver: @escaping (PacketDirection, GipPacket) -> Void = { _, _ in }
     ) -> GuitarDriver {
         GuitarDriver(
@@ -106,6 +124,7 @@ public final class GuitarDriver: ObservableObject {
             sink: KeyboardSink(keymap: keymap, emitter: emitter),
             thresholds: keymap.thresholds,
             log: log,
+            eventLog: eventLog,
             packetObserver: packetObserver
         )
     }
@@ -122,26 +141,31 @@ public final class GuitarDriver: ObservableObject {
     public func stop() async {
         guard let task = runTask else { return }
         runTask = nil
+        // Before the cancellation tears the connection down, so the log credits the release to the stop.
+        releaseKeys(because: .stop)
         task.cancel()
         await task.value
-        resetInput()
+        releaseInput(because: .stop)
         setStatus(.waitingForDongle)
     }
 
     /// Releases every key and ignores guitar input until `resume()`. The dongle stays connected.
-    public func pause() {
+    public func pause(reason: ReleaseReason = .pause) {
         guard !isPaused else { return }
         isPaused = true
-        sink.releaseAll()
+        eventLog.record(.paused)
+        releaseKeys(because: reason)
     }
 
     public func resume() {
+        guard isPaused else { return }
         isPaused = false
+        eventLog.record(.resumed)
     }
 
     /// Swaps the output, for example after the keymap changed. The old sink is released first.
     public func reconfigure(sink newSink: any OutputSink, thresholds: Thresholds) {
-        sink.releaseAll()
+        releaseKeys(because: .reconfigure)
         sink = newSink
         detector = ControlDetector(thresholds: thresholds)
     }
@@ -153,20 +177,21 @@ public final class GuitarDriver: ObservableObject {
         for await event in monitor.events() {
             switch event {
             case .arrived:
+                eventLog.record(.dongleArrived)
                 guard connection == nil else { continue }
                 connection = Task { await keepConnected() }
             case .removed:
-                log("dongle removed")
+                eventLog.record(.dongleRemoved)
                 connection?.cancel()
                 await connection?.value
                 connection = nil
-                resetInput()
+                releaseInput(because: .disconnect)
                 setStatus(.waitingForDongle)
             }
         }
         connection?.cancel()
         await connection?.value
-        resetInput()
+        releaseInput(because: .disconnect)
         if !Task.isCancelled { setStatus(.error(Self.monitorStoppedMessage)) }
     }
 
@@ -176,7 +201,7 @@ public final class GuitarDriver: ObservableObject {
         while !Task.isCancelled {
             setStatus(.connecting)
             do {
-                let transport = try await connector.connect()
+                let transport = try await openTransport()
                 // A write to a wedged pipe never completes; closing the transport is what unblocks it.
                 try await withTaskCancellationHandler {
                     try await run(on: transport)
@@ -192,20 +217,31 @@ public final class GuitarDriver: ObservableObject {
                 if Task.isCancelled { break }
                 setStatus(.error(error.localizedDescription))
             }
-            resetInput()
+            releaseInput(because: .disconnect)
             guard (try? await Task.sleep(for: timing.retryDelay)) != nil else { break }
         }
-        resetInput()
+        releaseInput(because: .disconnect)
+    }
+
+    private func openTransport() async throws -> any PacketTransport {
+        do {
+            return try await connector.connect()
+        } catch {
+            report(error) { reason in
+                (error as? DongleError) == .exclusiveAccess ? .dongleBusy : .connectFailed(reason)
+            }
+            throw error
+        }
     }
 
     private func run(on transport: any PacketTransport) async throws {
         defer {
             transport.close()
-            resetInput()
+            releaseInput(because: .disconnect)
         }
         gipSession = GipSession()
         let startPackets = gipSession.startPackets()
-        try await send(startPackets, over: transport)
+        try await send(startPackets, over: transport, failure: { .writeFailed($0) })
         setStatus(.dongleReady)
         let reader = Task { try await readPackets(from: transport) }
         let keepAliveTask = Task {
@@ -230,21 +266,37 @@ public final class GuitarDriver: ObservableObject {
     }
 
     private func readPackets(from transport: any PacketTransport) async throws {
-        for try await data in transport.incomingPackets() {
-            let transfer = decodePackets(data)
-            for packet in transfer.packets {
-                try await handle(packet, over: transport)
+        var failedWhileHandling = false
+        do {
+            for try await data in transport.incomingPackets() {
+                do {
+                    try await process(data, over: transport)
+                } catch {
+                    failedWhileHandling = true
+                    throw error
+                }
             }
-            if let failure = transfer.failure {
-                log("undecodable bytes (\(failure.error)): \(failure.tail.hexString)")
-            }
+        } catch {
+            // Handling reports its own write failures; only an error from the stream itself is a read failure.
+            if !failedWhileHandling { report(error) { .readFailed($0) } }
+            throw error
+        }
+    }
+
+    private func process(_ data: Data, over transport: any PacketTransport) async throws {
+        let transfer = decodePackets(data)
+        for packet in transfer.packets {
+            try await handle(packet, over: transport)
+        }
+        if let failure = transfer.failure {
+            log("undecodable bytes (\(failure.error)): \(failure.tail.hexString)")
         }
     }
 
     private func handle(_ packet: GipPacket, over transport: any PacketTransport) async throws {
         packetObserver(.received, packet)
         if let reason = gipSession.unsupportedReason(for: packet) { log(reason) }
-        try await send(gipSession.handle(packet), over: transport)
+        try await send(gipSession.handle(packet), over: transport, failure: { .writeFailed($0) })
         if packet.knownCommand == .ghlGuitarInput { handleGuitarReport(packet.payload) }
     }
 
@@ -253,14 +305,21 @@ public final class GuitarDriver: ObservableObject {
         while true {
             try await Task.sleep(for: timing.tick)
             let time = now()
-            try await send(gipSession.duePackets(now: time), over: transport)
+            try await send(gipSession.duePackets(now: time), over: transport, failure: { .keepAliveFailed($0) })
             releaseIfGuitarSilent(at: time)
         }
     }
 
-    private func send(_ packets: [GipPacket], over transport: any PacketTransport) async throws {
+    private func send(
+        _ packets: [GipPacket], over transport: any PacketTransport, failure: (String) -> LogEvent
+    ) async throws {
         for packet in packets {
-            try await transport.write(packet.encoded())
+            do {
+                try await transport.write(packet.encoded())
+            } catch {
+                report(error, as: failure)
+                throw error
+            }
             packetObserver(.sent, packet)
         }
     }
@@ -285,13 +344,13 @@ public final class GuitarDriver: ObservableObject {
 
     private func releaseIfGuitarSilent(at time: TimeInterval) {
         guard status == .guitarActive, let lastReportAt, time - lastReportAt > timing.guitarTimeout else { return }
-        log("guitar silent, releasing keys")
-        resetInput()
+        eventLog.record(.guitarSilent)
+        releaseInput(because: .silence)
         setStatus(.dongleReady)
     }
 
-    private func resetInput() {
-        sink.releaseAll()
+    private func releaseInput(because reason: ReleaseReason) {
+        releaseKeys(because: reason)
         detector.reset()
         lastReportAt = nil
         publish(nil)
@@ -301,9 +360,39 @@ public final class GuitarDriver: ObservableObject {
         if snapshot != newSnapshot { snapshot = newSnapshot }
     }
 
+    private func releaseKeys(because reason: ReleaseReason) {
+        eventLog.record(.inputReleased(count: sink.releaseAll(), reason: reason))
+    }
+
     private func setStatus(_ newStatus: DriverStatus) {
         guard status != newStatus else { return }
         status = newStatus
-        log("status: \(newStatus)")
+        recordStatus(newStatus)
+    }
+
+    /// A dongle that stays busy cycles connecting, error, connecting, error every retry; the loop is one
+    /// problem, so it is logged once and ends with the first healthy status.
+    private func recordStatus(_ newStatus: DriverStatus) {
+        let event = LogEvent.driverStatus(newStatus)
+        switch newStatus {
+        case .error:
+            recordOnce(event)
+        case .connecting:
+            if reportedFailures.isEmpty { eventLog.record(event) }
+        case .waitingForDongle, .dongleReady, .guitarActive:
+            reportedFailures.removeAll()
+            eventLog.record(event)
+        }
+    }
+
+    private func recordOnce(_ failure: LogEvent) {
+        guard reportedFailures.insert(failure).inserted else { return }
+        eventLog.record(failure)
+    }
+
+    /// A failure while shutting down is not a fault: closing the transport is what makes pending I/O throw.
+    private func report(_ error: Error, as event: (String) -> LogEvent) {
+        guard !Task.isCancelled, !(error is CancellationError) else { return }
+        recordOnce(event(error.localizedDescription))
     }
 }
