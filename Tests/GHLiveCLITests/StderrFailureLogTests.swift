@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import GHLiveCore
 import GuitarInput
@@ -27,13 +28,22 @@ private struct IdleTransport: PacketTransport {
     func close() {}
 }
 
-/// Busy for the first `busyAttempts` connects, then connects.
-private final class BusyThenReady: DongleConnecting, @unchecked Sendable {
+private struct Leaky: LocalizedError {
+    static let text = "text the public log must not carry"
+    var errorDescription: String? { Self.text }
+}
+
+/// Throws `error` for the first `failingAttempts` connects, then connects.
+private final class FailingThenReady: DongleConnecting, @unchecked Sendable {
     private let lock = NSLock()
-    private let busyAttempts: Int
+    private let failingAttempts: Int
+    private let error: Error
     private var attemptCount = 0
 
-    init(busyAttempts: Int) { self.busyAttempts = busyAttempts }
+    init(failingAttempts: Int, error: Error) {
+        self.failingAttempts = failingAttempts
+        self.error = error
+    }
 
     var attempts: Int { lock.withLock { attemptCount } }
 
@@ -42,7 +52,7 @@ private final class BusyThenReady: DongleConnecting, @unchecked Sendable {
             attemptCount += 1
             return attemptCount
         }
-        if attempt <= busyAttempts { throw DongleError.exclusiveAccess }
+        if attempt <= failingAttempts { throw error }
         return IdleTransport()
     }
 }
@@ -56,33 +66,48 @@ private final class NoOutput: OutputSink {
 @MainActor
 @Suite("Stderr failure log")
 struct StderrFailureLogTests {
-    @Test("only driver errors are printed, in the retrying form")
+    @Test("only driver errors are printed, in the retrying form, with the status text the user sees")
     func printsErrorStatusesOnly() {
         let lines = Lines()
-        let log = StderrFailureLog { lines.append($0) }
+        let latest = LatestStatus()
+        let log = StderrFailureLog(latestStatus: latest) { lines.append($0) }
         log.record(.driverStatus(.connecting))
         log.record(.dongleBusy)
         log.record(.driverStatus(.error("boom")))
-        #expect(lines.all == ["error: boom (retrying)"])
+        latest.value = .error("the full message")
+        log.record(.driverStatus(.error("boom")))
+        #expect(lines.all == ["error: boom (retrying)", "error: the full message (retrying)"])
     }
 
     @Test("a dongle that stays busy prints one line, however many times the driver retries")
     func busyDongleIsReportedOnce() async {
+        let lines = await run(failingWith: DongleError.exclusiveAccess)
+        #expect(lines == ["error: \(DongleError.exclusiveAccess.localizedDescription) (retrying)"])
+    }
+
+    @Test("the terminal shows the error's own text although the public log only names its type")
+    func terminalKeepsTheFullMessage() async {
+        let lines = await run(failingWith: Leaky())
+        #expect(lines == ["error: \(Leaky.text) (retrying)"])
+    }
+
+    private func run(failingWith error: Error) async -> [String] {
         let lines = Lines()
+        let latest = LatestStatus()
         var timing = GuitarDriver.Timing()
         timing.retryDelay = .milliseconds(10)
-        let connector = BusyThenReady(busyAttempts: 3)
+        let connector = FailingThenReady(failingAttempts: 3, error: error)
         let driver = GuitarDriver(
             monitor: OneArrival(), connector: connector, sink: NoOutput(), timing: timing,
-            eventLog: StderrFailureLog { lines.append($0) })
+            eventLog: StderrFailureLog(latestStatus: latest) { lines.append($0) })
+        let follower = driver.$status.sink { latest.value = $0 }
         driver.start()
         let deadline = ContinuousClock.now + .seconds(30)
         while connector.attempts < 4, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(5))
         }
         await driver.stop()
-
-        #expect(connector.attempts >= 4)
-        #expect(lines.all == ["error: \(DongleError.exclusiveAccess.localizedDescription) (retrying)"])
+        follower.cancel()
+        return lines.all
     }
 }

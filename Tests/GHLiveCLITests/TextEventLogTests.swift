@@ -21,12 +21,17 @@ struct TextEventLogTests {
     @Test("verbose adds the terminal to the system log")
     func verboseWritesToTheTerminal() {
         let lines = Lines()
+        let errors = Lines()
         let system = RecordingEventLog()
-        makeEventLog(verbose: true, system: system, reportError: { _ in }) { lines.all.append($0) }.record(
-            .dongleArrived)
-        makeEventLog(verbose: false, system: system, reportError: { _ in }) { lines.all.append($0) }.record(
-            .dongleRemoved)
-        #expect(lines.all == ["dongle arrived"])
-        #expect(system.events == [.dongleArrived, .dongleRemoved])
+        let failures = StderrFailureLog(latestStatus: LatestStatus()) { errors.all.append($0) }
+        let verbose = makeEventLog(verbose: true, system: system, failures: failures) { lines.all.append($0) }
+        let quiet = makeEventLog(verbose: false, system: system, failures: failures) { lines.all.append($0) }
+        verbose.record(.dongleArrived)
+        quiet.record(.dongleRemoved)
+        verbose.record(.driverStatus(.error("x")))
+        quiet.record(.driverStatus(.error("x")))
+        #expect(lines.all == ["dongle arrived", "status: error: x"])
+        #expect(system.events.count == 4)
+        #expect(errors.all == ["error: x (retrying)", "error: x (retrying)"])
     }
 }
