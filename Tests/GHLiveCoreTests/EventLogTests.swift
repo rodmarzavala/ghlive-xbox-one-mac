@@ -34,8 +34,18 @@ struct EventLogTests {
         #expect(LogEvent.keepAliveFailed("x").level == .error)
         #expect(LogEvent.keymapLoadFailed.level == .error)
         #expect(LogEvent.terminationTimedOut.level == .fault)
+        #expect(LogEvent.inputReleased(count: 1, reason: .pause).level == .notice)
         #expect(LogEvent.inputReleased(count: 2, reason: .pause).level == .notice)
         #expect(LogEvent.inputReleased(count: 0, reason: .pause).level == .debug)
+    }
+
+    @Test("levels map to the unified log types that persist")
+    func osLogTypes() {
+        #expect(LogLevel.debug.osLogType == .debug)
+        #expect(LogLevel.info.osLogType == .info)
+        #expect(LogLevel.notice.osLogType == .default)
+        #expect(LogLevel.error.osLogType == .error)
+        #expect(LogLevel.fault.osLogType == .fault)
     }
 
     @Test("every category is used by some event")

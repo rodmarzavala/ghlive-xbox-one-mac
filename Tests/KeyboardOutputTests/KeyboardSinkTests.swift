@@ -102,6 +102,12 @@ struct KeyboardSinkTests {
         #expect(sink.releaseAll() == 0)
     }
 
+    @Test("releaseAll counts a key shared by two controls once")
+    func releaseAllCountsSharedKeyOnce() {
+        apply([.heroPower, .tilt])
+        #expect(sink.releaseAll() == 1)
+    }
+
     @Test("releaseAll is idempotent and the next press is emitted again")
     func releaseAllIdempotent() {
         apply([.black1])

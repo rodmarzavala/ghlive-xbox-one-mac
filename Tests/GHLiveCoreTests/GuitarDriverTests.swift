@@ -460,6 +460,11 @@ struct GuitarDriverTests {
     }
 }
 
+private func isReadFailure(_ event: LogEvent) -> Bool {
+    if case .readFailed = event { return true }
+    return false
+}
+
 @MainActor
 @Suite("Guitar driver event log", .serialized)
 struct GuitarDriverEventLogTests {
@@ -503,6 +508,25 @@ struct GuitarDriverEventLogTests {
             harness.meaningfulEvents == [
                 .dongleArrived, status(.connecting), .dongleBusy,
                 status(.error(DongleError.exclusiveAccess.localizedDescription)), status(.dongleReady),
+            ])
+        await harness.driver.stop()
+    }
+
+    @Test("a different failure after the first is still logged, once")
+    func differentFailureIsLogged() async {
+        let transport = FakeTransport()
+        let busy: Result<FakeTransport, Error> = .failure(DongleError.exclusiveAccess)
+        let noGip: Result<FakeTransport, Error> = .failure(DongleError.noGipInterface)
+        let harness = Harness(connector: FakeConnector([busy, busy, noGip, noGip, .success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        #expect(await eventually { harness.driver.status == .dongleReady })
+
+        let noGipText = DongleError.noGipInterface.localizedDescription
+        #expect(
+            harness.meaningfulEvents == [
+                .dongleArrived, status(.connecting), .dongleBusy,
+                status(.error(DongleError.exclusiveAccess.localizedDescription)),
+                .connectFailed(noGipText), status(.error(noGipText)), status(.dongleReady),
             ])
         await harness.driver.stop()
     }
@@ -588,6 +612,7 @@ struct GuitarDriverEventLogTests {
         harness.monitor.send(.arrived)
         let expected = LogEvent.writeFailed(DongleError.disconnected.localizedDescription)
         #expect(await eventually { harness.events.events.contains(expected) })
+        #expect(!harness.events.events.contains { if case .readFailed = $0 { true } else { false } })
         await harness.driver.stop()
     }
 

@@ -149,7 +149,7 @@ public struct OSLogEventLog: EventLog {
 }
 
 extension LogLevel {
-    fileprivate var osLogType: OSLogType {
+    var osLogType: OSLogType {
         switch self {
         case .debug: .debug
         case .info: .info
