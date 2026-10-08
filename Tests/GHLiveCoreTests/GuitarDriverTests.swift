@@ -661,6 +661,20 @@ struct GuitarDriverEventLogTests {
         await harness.driver.stop()
     }
 
+    @Test("a failed acknowledgement write is a write failure, never a read failure")
+    func ackWriteFailure() async {
+        let transport = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(transport)]))
+        await harness.arrive(waitingFor: transport)
+        transport.failWrites(from: transport.written.count)
+        let status = GipPacket(
+            command: .status, flags: [.acknowledgeRequired, .system], sequence: 1, payload: Data([0x01, 0, 0, 0]))
+        transport.feed(status.encoded())
+        #expect(await eventually { harness.events.events.contains(.writeFailed(.dongle(.disconnected))) })
+        #expect(!harness.events.events.contains(where: isReadFailure))
+        await harness.driver.stop()
+    }
+
     @Test("a failed handshake write is a write failure")
     func writeFailure() async {
         let first = FakeTransport()
