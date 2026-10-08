@@ -695,6 +695,9 @@ struct GuitarDriverEventLogTests {
         let transport = FakeTransport()
         let harness = Harness(connector: FakeConnector([.success(transport)]))
         await harness.arrive(waitingFor: transport)
+        // The first keep-alive follows the handshake; on a slow runner it can land after arrive() returns.
+        let handshakeAndFirstKeepAlive = 4
+        #expect(await eventually { transport.written.count >= handshakeAndFirstKeepAlive })
         transport.failWrites(from: transport.written.count)
         let status = GipPacket(
             command: .status, flags: [.acknowledgeRequired, .system], sequence: 1, payload: Data([0x01, 0, 0, 0]))
