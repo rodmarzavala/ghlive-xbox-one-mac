@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- GHLive now writes its events to the macOS system log (subsystem `io.github.rodmarzavala.ghlive`), so a problem reported days later leaves evidence: dongle arrival and removal, status changes, connection and USB errors, the guitar going silent, how many keys were released and why, pause and resume, Accessibility changes, and launch and quit. It logs events only, never which keys or controls you press. See [Collecting logs](docs/troubleshooting.md#collecting-logs).
+
 ## [1.0.1] - 2026-10-06
 
 ### Fixed
