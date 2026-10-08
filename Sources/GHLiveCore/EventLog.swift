@@ -33,23 +33,16 @@ public enum TerminationTrigger: String, Sendable {
 }
 
 /// Why something failed, in a form that is safe to publish: a `DongleError` has fixed texts, any other
-/// error is named by its type only, because its description could carry anything.
-public enum FailureReason: Hashable, Sendable, CustomStringConvertible {
-    case dongle(DongleError)
-    case other(typeName: String)
+/// error is named by its type only, because its description could carry anything. The only way to make
+/// one is from an `Error`, so no free-form text can get in.
+public struct FailureReason: Hashable, Sendable, CustomStringConvertible {
+    public let description: String
 
     public init(_ error: Error) {
         if let dongleError = error as? DongleError {
-            self = .dongle(dongleError)
+            description = dongleError.localizedDescription
         } else {
-            self = .other(typeName: String(describing: type(of: error)))
-        }
-    }
-
-    public var description: String {
-        switch self {
-        case .dongle(let error): error.localizedDescription
-        case .other(let typeName): "unexpected error (\(typeName))"
+            description = "unexpected error (\(String(describing: type(of: error))))"
         }
     }
 }

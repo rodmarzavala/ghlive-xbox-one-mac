@@ -8,6 +8,8 @@ import USBTransport
 private let repositoryRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
+private struct SomeFailure: Error {}
+
 @Suite("Event log")
 struct EventLogTests {
     @Test("the subsystem is the published bundle id")
@@ -29,10 +31,10 @@ struct EventLogTests {
         #expect(LogEvent.driverStatus(.error("x")).level == .error)
         #expect(LogEvent.dongleArrived.level == .notice)
         #expect(LogEvent.dongleBusy.level == .error)
-        #expect(LogEvent.connectFailed(.other(typeName: "X")).level == .error)
-        #expect(LogEvent.readFailed(.other(typeName: "X")).level == .error)
-        #expect(LogEvent.writeFailed(.other(typeName: "X")).level == .error)
-        #expect(LogEvent.keepAliveFailed(.other(typeName: "X")).level == .error)
+        #expect(LogEvent.connectFailed(FailureReason(SomeFailure())).level == .error)
+        #expect(LogEvent.readFailed(FailureReason(SomeFailure())).level == .error)
+        #expect(LogEvent.writeFailed(FailureReason(SomeFailure())).level == .error)
+        #expect(LogEvent.keepAliveFailed(FailureReason(SomeFailure())).level == .error)
         #expect(LogEvent.keymapLoadFailed.level == .error)
         #expect(LogEvent.terminationTimedOut.level == .fault)
         #expect(LogEvent.inputReleased(count: 1, reason: .pause).level == .notice)
@@ -60,8 +62,8 @@ struct EventLogTests {
     @Test("a failure reason keeps a dongle error's fixed text and names any other error by its type only")
     func failureReasons() {
         struct Leaky: LocalizedError { var errorDescription: String? { "private details" } }
-        #expect(FailureReason(DongleError.noGipInterface) == .dongle(.noGipInterface))
-        #expect(FailureReason(Leaky()) == .other(typeName: "Leaky"))
+        #expect(
+            FailureReason(DongleError.noGipInterface).description == DongleError.noGipInterface.localizedDescription)
         #expect(FailureReason(Leaky()).description == "unexpected error (Leaky)")
     }
 

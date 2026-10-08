@@ -535,7 +535,8 @@ struct GuitarDriverEventLogTests {
             harness.meaningfulEvents == [
                 .dongleArrived, status(.connecting), .dongleBusy,
                 status(.error(DongleError.exclusiveAccess.localizedDescription)),
-                .connectFailed(.dongle(.noGipInterface)), status(.error(noGipText)), status(.dongleReady),
+                .connectFailed(FailureReason(DongleError.noGipInterface)), status(.error(noGipText)),
+                status(.dongleReady),
             ])
         await harness.driver.stop()
     }
@@ -612,7 +613,7 @@ struct GuitarDriverEventLogTests {
         #expect(
             harness.meaningfulEvents == [
                 .dongleArrived, status(.connecting), status(.dongleReady),
-                .readFailed(.dongle(failure)), status(.error(failure.localizedDescription)),
+                .readFailed(FailureReason(failure)), status(.error(failure.localizedDescription)),
                 status(.waitingForDongle),
             ])
     }
@@ -622,7 +623,7 @@ struct GuitarDriverEventLogTests {
         let harness = Harness(connector: FakeConnector([.failure(DongleError.noGipInterface)]))
         harness.driver.start()
         harness.monitor.send(.arrived)
-        let expected = LogEvent.connectFailed(.dongle(.noGipInterface))
+        let expected = LogEvent.connectFailed(FailureReason(DongleError.noGipInterface))
         #expect(await eventually { harness.events.events.contains(expected) })
         await harness.driver.stop()
     }
@@ -683,7 +684,7 @@ struct GuitarDriverEventLogTests {
         first.fail(failure)
         #expect(await eventually { second.written.count == 4 })
 
-        let reads = harness.events.events.filter { $0 == .readFailed(.dongle(failure)) }
+        let reads = harness.events.events.filter { $0 == .readFailed(FailureReason(failure)) }
         #expect(reads.count == 1)
         #expect(!harness.events.events.contains { if case .writeFailed = $0 { true } else { false } })
         await harness.driver.stop()
@@ -698,7 +699,8 @@ struct GuitarDriverEventLogTests {
         let status = GipPacket(
             command: .status, flags: [.acknowledgeRequired, .system], sequence: 1, payload: Data([0x01, 0, 0, 0]))
         transport.feed(status.encoded())
-        #expect(await eventually { harness.events.events.contains(.writeFailed(.dongle(.disconnected))) })
+        #expect(
+            await eventually { harness.events.events.contains(.writeFailed(FailureReason(DongleError.disconnected))) })
         #expect(!harness.events.events.contains(where: isReadFailure))
         await harness.driver.stop()
     }
@@ -710,7 +712,7 @@ struct GuitarDriverEventLogTests {
         let harness = Harness(connector: FakeConnector([.success(first)]))
         harness.driver.start()
         harness.monitor.send(.arrived)
-        let expected = LogEvent.writeFailed(.dongle(.disconnected))
+        let expected = LogEvent.writeFailed(FailureReason(DongleError.disconnected))
         #expect(await eventually { harness.events.events.contains(expected) })
         #expect(!harness.events.events.contains { if case .readFailed = $0 { true } else { false } })
         await harness.driver.stop()
@@ -727,7 +729,7 @@ struct GuitarDriverEventLogTests {
         harness.clock.advance(by: GipSession.keepAliveInterval + 0.1)
 
         #expect(await eventually { second.written.count == 4 })
-        #expect(harness.events.events.contains(.keepAliveFailed(.dongle(failure))))
+        #expect(harness.events.events.contains(.keepAliveFailed(FailureReason(failure))))
         await harness.driver.stop()
     }
 

@@ -235,7 +235,7 @@ public final class GuitarDriver: ObservableObject {
             return transport
         } catch {
             report(error) { reason in
-                reason == .dongle(.exclusiveAccess) ? .dongleBusy : .connectFailed(reason)
+                reason == FailureReason(DongleError.exclusiveAccess) ? .dongleBusy : .connectFailed(reason)
             }
             throw error
         }
