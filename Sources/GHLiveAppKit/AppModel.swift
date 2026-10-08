@@ -57,6 +57,8 @@ public final class AppModel: ObservableObject {
     private let accessibility: any AccessibilityChecking
     private let launchAtLogin: any LaunchAtLoginControlling
     private let openURL: (URL) -> Void
+    private let eventLog: any EventLog
+    private let hasKeymapLoadProblem: Bool
     private let pollInterval: Duration
     private var pollTask: Task<Void, Never>?
     private var pendingTermination: PendingTermination?
@@ -78,6 +80,7 @@ public final class AppModel: ObservableObject {
         accessibility: any AccessibilityChecking,
         launchAtLogin: any LaunchAtLoginControlling,
         openURL: @escaping (URL) -> Void,
+        eventLog: any EventLog = NullEventLog(),
         pollInterval: Duration = AppModel.defaultPollInterval
     ) {
         self.driver = driver
@@ -87,6 +90,8 @@ public final class AppModel: ObservableObject {
         self.accessibility = accessibility
         self.launchAtLogin = launchAtLogin
         self.openURL = openURL
+        self.eventLog = eventLog
+        hasKeymapLoadProblem = keymapProblem != nil
         self.pollInterval = pollInterval
         let settings = SettingsModel(keymap: keymap, store: store, loadProblem: keymapProblem)
         let status = StatusPresentation(status: driver.status, isPaused: driver.isPaused)
@@ -165,6 +170,9 @@ public final class AppModel: ObservableObject {
     // MARK: Lifecycle
 
     public func start() {
+        eventLog.record(.launched(version: GHLiveInfo.version))
+        eventLog.record(.accessibility(isTrusted: isTrusted))
+        if hasKeymapLoadProblem { eventLog.record(.keymapLoadFailed) }
         driver.start()
         startPollingSystemState()
     }
@@ -179,29 +187,34 @@ public final class AppModel: ObservableObject {
     /// Answers the system's "may I quit?" question: `reply` runs once the keys are released, or after
     /// `timeout` if stopping hangs, so a stuck dongle can never keep the app from quitting. Asking again
     /// while a termination is pending joins it.
-    public func terminate(timeout: Duration = AppModel.terminationTimeout, reply: @escaping @MainActor () -> Void) {
-        terminate(shutdown: { await self.shutdown() }, timeout: timeout, reply: reply)
+    public func terminate(
+        trigger: TerminationTrigger = .quit, timeout: Duration = AppModel.terminationTimeout,
+        reply: @escaping @MainActor () -> Void
+    ) {
+        terminate(trigger: trigger, shutdown: { await self.shutdown() }, timeout: timeout, reply: reply)
     }
 
     func terminate(
-        shutdown: @escaping @MainActor () async -> Void, timeout: Duration, reply: @escaping @MainActor () -> Void
+        trigger: TerminationTrigger = .quit, shutdown: @escaping @MainActor () async -> Void, timeout: Duration,
+        reply: @escaping @MainActor () -> Void
     ) {
+        eventLog.record(.terminationRequested(trigger))
         if let pending = pendingTermination {
             pending.add(reply)
             return
         }
-        let pending = PendingTermination()
+        let pending = PendingTermination(eventLog: eventLog)
         pending.add(reply)
         pendingTermination = pending
         // Released before anything can hang, so even a timed-out quit leaves no key held.
-        driver.pause()
+        driver.pause(reason: .quit)
         Task {
             await shutdown()
-            pending.finish()
+            pending.finish(.terminationFinished)
         }
         Task {
             try? await Task.sleep(for: timeout)
-            pending.finish()
+            pending.finish(.terminationTimedOut)
         }
     }
 
@@ -225,6 +238,7 @@ public final class AppModel: ObservableObject {
         let trusted = accessibility.isTrusted
         guard trusted != isTrusted else { return }
         isTrusted = trusted
+        eventLog.record(.accessibility(isTrusted: trusted))
         publishMenu()
         if trusted { apply(keymap) }
     }
@@ -285,6 +299,11 @@ public final class AppModel: ObservableObject {
 private final class PendingTermination {
     private var replies: [@MainActor () -> Void] = []
     private var isFinished = false
+    private let eventLog: any EventLog
+
+    init(eventLog: any EventLog) {
+        self.eventLog = eventLog
+    }
 
     func add(_ reply: @escaping @MainActor () -> Void) {
         if isFinished {
@@ -294,9 +313,12 @@ private final class PendingTermination {
         }
     }
 
-    func finish() {
+    /// The first call logs how the termination ended, then runs the replies. The log comes first because a
+    /// reply may end the process.
+    func finish(_ outcome: LogEvent) {
         guard !isFinished else { return }
         isFinished = true
+        eventLog.record(outcome)
         let waiting = replies
         replies = []
         for reply in waiting { reply() }

@@ -91,7 +91,8 @@ private func run(_ options: RunOptions) async -> Int32 {
     let log: @Sendable (String) -> Void = { text in
         if options.verbose { printLine(text) }
     }
-    let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log)
+    let eventLog = makeEventLog(verbose: options.verbose, write: printLine)
+    let driver = GuitarDriver.live(keymap: keymap, emitter: emitter, log: log, eventLog: eventLog)
     let subscription = options.verbose ? reportInput(of: driver) : nil
     let errorReports = driver.$status.removeDuplicates().compactMap(StatusReporter.line(for:)).sink(
         receiveValue: printError)
@@ -124,6 +125,7 @@ private func sniff() async -> Int32 {
         connector: DongleConnector(),
         sink: DiscardingSink(),
         log: printLine,
+        eventLog: makeEventLog(verbose: true, write: printLine),
         packetObserver: { direction, packet in
             let label = direction == .received ? "rx" : "tx"
             let name = packet.knownCommand.map { "\($0)" } ?? "unknown"

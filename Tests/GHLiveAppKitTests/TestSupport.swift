@@ -84,21 +84,26 @@ struct AppFixture {
     let accessibility: FakeAccessibility
     let launchAtLogin = FakeLaunchAtLogin()
     let opened = OpenedURLs()
+    let events = RecordingEventLog()
     let keymapFolder = FileManager.default.temporaryDirectory
         .appendingPathComponent("ghlive-tests-\(UUID().uuidString)", isDirectory: true)
 
     init(
-        isTrusted: Bool = true, dongle: ScriptedDongle? = nil, pollInterval: Duration = AppModel.defaultPollInterval
+        isTrusted: Bool = true, dongle: ScriptedDongle? = nil, keymapProblem: String? = nil,
+        pollInterval: Duration = AppModel.defaultPollInterval
     ) {
         accessibility = FakeAccessibility(isTrusted: isTrusted)
         let urls = opened
         let driver = GuitarDriver(
             monitor: dongle.map { $0 as any DongleEventSource } ?? SilentMonitor(),
-            connector: dongle.map { $0 as any DongleConnecting } ?? UnreachableConnector(), sink: sink)
+            connector: dongle.map { $0 as any DongleConnecting } ?? UnreachableConnector(), sink: sink,
+            eventLog: events)
         model = AppModel(
             driver: driver, emitter: RecordingEmitter(), keymap: .default, store: store,
-            keymapFolder: keymapFolder, accessibility: accessibility, launchAtLogin: launchAtLogin,
+            keymapFolder: keymapFolder, keymapProblem: keymapProblem, accessibility: accessibility,
+            launchAtLogin: launchAtLogin,
             openURL: { urls.urls.append($0) },
+            eventLog: events,
             pollInterval: pollInterval)
     }
 }
