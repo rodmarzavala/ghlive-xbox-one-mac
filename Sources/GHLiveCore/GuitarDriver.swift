@@ -225,7 +225,10 @@ public final class GuitarDriver: ObservableObject {
 
     private func openTransport() async throws -> any PacketTransport {
         do {
-            return try await connector.connect()
+            let transport = try await connector.connect()
+            // Connecting says nothing about a dongle that keeps failing after the handshake.
+            if !reportedFailures.contains(where: \.isConnectionFailure) { reportedFailures.removeAll() }
+            return transport
         } catch {
             report(error) { reason in
                 (error as? DongleError) == .exclusiveAccess ? .dongleBusy : .connectFailed(reason)
@@ -295,6 +298,7 @@ public final class GuitarDriver: ObservableObject {
 
     private func handle(_ packet: GipPacket, over transport: any PacketTransport) async throws {
         packetObserver(.received, packet)
+        reportedFailures.removeAll()
         if let reason = gipSession.unsupportedReason(for: packet) { log(reason) }
         try await send(gipSession.handle(packet), over: transport, failure: { .writeFailed($0) })
         if packet.knownCommand == .ghlGuitarInput { handleGuitarReport(packet.payload) }
@@ -370,17 +374,20 @@ public final class GuitarDriver: ObservableObject {
         recordStatus(newStatus)
     }
 
-    /// A dongle that stays busy cycles connecting, error, connecting, error every retry; the loop is one
-    /// problem, so it is logged once and ends with the first healthy status.
+    /// A dongle that stays busy, or takes the handshake and then fails, cycles through connecting, ready and
+    /// error on every retry. The loop is one problem: it is logged once and ends with the first packet the
+    /// dongle sends, or when the guitar is active or the dongle is gone.
     private func recordStatus(_ newStatus: DriverStatus) {
         let event = LogEvent.driverStatus(newStatus)
         switch newStatus {
         case .error:
             recordOnce(event)
-        case .connecting:
+        case .connecting, .dongleReady:
             if reportedFailures.isEmpty { eventLog.record(event) }
-        case .waitingForDongle, .dongleReady, .guitarActive:
+        case .waitingForDongle:
             reportedFailures.removeAll()
+            eventLog.record(event)
+        case .guitarActive:
             eventLog.record(event)
         }
     }

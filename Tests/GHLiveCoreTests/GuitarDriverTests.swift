@@ -531,6 +531,59 @@ struct GuitarDriverEventLogTests {
         await harness.driver.stop()
     }
 
+    @Test("the same failure after a healthy stretch is logged again")
+    func sameFailureAfterHealthyStatus() async {
+        let transports = [FakeTransport(), FakeTransport(), FakeTransport()]
+        let harness = Harness(connector: FakeConnector(transports.map { .success($0) }))
+        let failure = DongleError.ioFailure(operation: "read", code: kIOReturnBadArgument)
+        await harness.arrive(waitingFor: transports[0])
+        for (index, transport) in transports.enumerated() {
+            if index > 0 { #expect(await eventually { transport.written.count == 4 }) }
+            if index < 2 {
+                transport.feed(guitarMessage(idleReport))
+                #expect(await eventually { harness.driver.status == .guitarActive })
+            }
+            transport.fail(failure)
+            #expect(await eventually { harness.events.events.count(where: isReadFailure) >= min(index + 1, 2) })
+        }
+        #expect(await eventually { harness.connector.attempts >= 4 })
+
+        #expect(harness.events.events.count(where: isReadFailure) == 2)
+        await harness.driver.stop()
+    }
+
+    @Test("unplugging the dongle ends the episode, so the same failure is logged again on return")
+    func removalEndsTheEpisode() async {
+        let busy: Result<FakeTransport, Error> = .failure(DongleError.exclusiveAccess)
+        let harness = Harness(connector: FakeConnector([busy, busy, busy, busy]))
+        await harness.arrive()
+        #expect(await eventually { harness.events.events.contains(.dongleBusy) })
+        harness.monitor.send(.removed)
+        #expect(await eventually { harness.driver.status == .waitingForDongle })
+        harness.monitor.send(.arrived)
+        #expect(await eventually { harness.events.events.count(where: { $0 == .dongleBusy }) == 2 })
+        await harness.driver.stop()
+    }
+
+    @Test("a dongle that takes the handshake and fails every read is one episode, not one per retry")
+    func handshakeThenReadFailureLoop() async {
+        let failure = DongleError.ioFailure(operation: "read", code: kIOReturnBadArgument)
+        let transports = (0..<4).map { _ in FakeTransport() }
+        for transport in transports { transport.fail(failure) }
+        let harness = Harness(connector: FakeConnector(transports.map { .success($0) }))
+        harness.driver.start()
+        harness.monitor.send(.arrived)
+        #expect(await eventually { harness.connector.attempts >= 4 })
+        await harness.driver.stop()
+
+        #expect(
+            harness.meaningfulEvents == [
+                .dongleArrived, status(.connecting), status(.dongleReady),
+                .readFailed(failure.localizedDescription), status(.error(failure.localizedDescription)),
+                status(.waitingForDongle),
+            ])
+    }
+
     @Test("another connect failure is logged with its description")
     func connectFailure() async {
         let harness = Harness(connector: FakeConnector([.failure(DongleError.noGipInterface)]))

@@ -54,6 +54,14 @@ public enum LogEvent: Hashable, Sendable {
     case terminationFinished
     case terminationTimedOut
 
+    /// A failure of the open connection, as opposed to one while connecting.
+    var isConnectionFailure: Bool {
+        switch self {
+        case .readFailed, .writeFailed, .keepAliveFailed: true
+        default: false
+        }
+    }
+
     public var category: LogCategory {
         switch self {
         case .driverStatus, .guitarSilent, .paused, .resumed:
