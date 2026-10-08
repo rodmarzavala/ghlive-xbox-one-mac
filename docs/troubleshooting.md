@@ -78,16 +78,16 @@ GHLive writes its events to the macOS system log, so a problem you notice days l
 To read what happened in the last two hours:
 
 ```sh
-log show --last 2h --info --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
+/usr/bin/log show --last 2h --info --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
 ```
 
 To watch it live while you reproduce a problem:
 
 ```sh
-log stream --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
+/usr/bin/log stream --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
 ```
 
-Add `--last 3d` (or any other span) to `log show` to look further back. Read the lines around the time the problem started and paste them into your [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose); remove anything personal first. A line such as `dongle removed` with no `dongle read failed` or `dongle write failed` before it means the dongle was unplugged or lost power; repeated read or write failures point at the USB link or the radio between the guitar and the dongle, for example interference from other wireless devices.
+Add `--last 3d` (or any other span) to `log show` to look further back. The full path `/usr/bin/log` matters: in zsh, a bare `log` is a different, built-in command. `log show` may ask for an administrator account. Read the lines around the time the problem started and paste them into your [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose); remove anything personal first. A `dongle removed` line means macOS saw the dongle disappear (unplugged, lost power or a USB fault), and a read or write failure can come just before or after it. Repeated read or write failures with no removal point at the USB link or the radio between the guitar and the dongle; the log alone cannot tell you which, so include it in your report.
 
 ## Still stuck
 

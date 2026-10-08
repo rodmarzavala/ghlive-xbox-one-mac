@@ -8,9 +8,9 @@ cd "$ROOT"
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
 # One source of truth: the unified-log subsystem in the code is the bundle id of the app.
-BUNDLE_ID="$(sed -n 's/.*bundleIdentifier = "\(.*\)".*/\1/p' Sources/GHLiveCore/GHLiveInfo.swift)"
-if [[ -z "$BUNDLE_ID" ]]; then
-    echo "error: no bundleIdentifier in Sources/GHLiveCore/GHLiveInfo.swift" >&2
+BUNDLE_ID="$(sed -n 's/.*bundleIdentifier = "\([^"]*\)".*/\1/p' Sources/GHLiveCore/GHLiveInfo.swift)"
+if [[ "$(printf '%s\n' "$BUNDLE_ID" | grep -c .)" -ne 1 || ! "$BUNDLE_ID" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    echo "error: expected exactly one valid bundleIdentifier in Sources/GHLiveCore/GHLiveInfo.swift, got '${BUNDLE_ID}'" >&2
     exit 1
 fi
 MIN_MACOS="13.0"
