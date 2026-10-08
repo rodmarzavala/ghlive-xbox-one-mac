@@ -58,6 +58,9 @@ public final class GuitarDriver: ObservableObject {
         public var tick: Duration = .milliseconds(250)
         /// A guitar that has not reported for this long is no longer `guitarActive`.
         public var guitarTimeout: TimeInterval = 1
+        /// A connection that stays up this long counts as healthy, which ends a logged failure episode. Far
+        /// longer than `retryDelay`, so a dongle that fails right after each handshake stays one episode.
+        public var healthyStretch: TimeInterval = 30
 
         public init() {}
     }
@@ -83,6 +86,7 @@ public final class GuitarDriver: ObservableObject {
     private var detector: ControlDetector
     private var gipSession = GipSession()
     private var lastReportAt: TimeInterval?
+    private var connectedAt: TimeInterval?
     private var hasWarnedAboutReports = false
     private var runTask: Task<Void, Never>?
     /// Failures already logged since the last healthy state, so a retry loop logs each one once.
@@ -240,12 +244,14 @@ public final class GuitarDriver: ObservableObject {
     private func run(on transport: any PacketTransport) async throws {
         defer {
             transport.close()
+            connectedAt = nil
             releaseInput(because: .disconnect)
         }
         gipSession = GipSession()
         let startPackets = gipSession.startPackets()
         try await send(startPackets, over: transport, failure: { .writeFailed($0) })
         setStatus(.dongleReady)
+        connectedAt = now()
         let reader = Task { try await readPackets(from: transport) }
         let keepAliveTask = Task {
             do {
@@ -298,7 +304,6 @@ public final class GuitarDriver: ObservableObject {
 
     private func handle(_ packet: GipPacket, over transport: any PacketTransport) async throws {
         packetObserver(.received, packet)
-        reportedFailures.removeAll()
         if let reason = gipSession.unsupportedReason(for: packet) { log(reason) }
         try await send(gipSession.handle(packet), over: transport, failure: { .writeFailed($0) })
         if packet.knownCommand == .ghlGuitarInput { handleGuitarReport(packet.payload) }
@@ -309,9 +314,16 @@ public final class GuitarDriver: ObservableObject {
         while true {
             try await Task.sleep(for: timing.tick)
             let time = now()
+            endEpisodeIfHealthy(at: time)
             try await send(gipSession.duePackets(now: time), over: transport, failure: { .keepAliveFailed($0) })
             releaseIfGuitarSilent(at: time)
         }
+    }
+
+    private func endEpisodeIfHealthy(at time: TimeInterval) {
+        guard let connectedAt, time - connectedAt >= timing.healthyStretch else { return }
+        self.connectedAt = nil
+        reportedFailures.removeAll()
     }
 
     private func send(
@@ -339,6 +351,9 @@ public final class GuitarDriver: ObservableObject {
             hasWarnedAboutReports = true
             return
         }
+        // Only a guitar report proves the link works end to end: the dongle answers the handshake with status
+        // messages even when it then fails every read.
+        reportedFailures.removeAll()
         let controls = detector.detect(state)
         lastReportAt = now()
         setStatus(.guitarActive)
@@ -380,8 +395,8 @@ public final class GuitarDriver: ObservableObject {
     }
 
     /// A dongle that stays busy, or takes the handshake and then fails, cycles through connecting, ready and
-    /// error on every retry. The loop is one problem: it is logged once and ends with the first packet the
-    /// dongle sends, or when the guitar is active or the dongle is gone.
+    /// error on every retry. The loop is one problem: it is logged once and ends with the first guitar report,
+    /// a connection that stays up for `healthyStretch`, or the dongle being gone.
     private func recordStatus(_ newStatus: DriverStatus) {
         let event = LogEvent.driverStatus(newStatus)
         switch newStatus {

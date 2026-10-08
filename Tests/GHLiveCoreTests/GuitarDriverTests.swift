@@ -465,6 +465,10 @@ private struct UnexpectedFailure: LocalizedError {
     var errorDescription: String? { Self.secret }
 }
 
+private let statusMessage = GipPacket(
+    command: .status, flags: .system, sequence: 2, payload: Data([0x83])
+).encoded()
+
 private func isReadFailure(_ event: LogEvent) -> Bool {
     if case .readFailed = event { return true }
     return false
@@ -570,11 +574,35 @@ struct GuitarDriverEventLogTests {
         await harness.driver.stop()
     }
 
+    @Test("a connection that only exchanges status messages and stays up long enough ends the episode")
+    func healthyStretchEndsTheEpisode() async {
+        let failure = DongleError.ioFailure(operation: "read", code: kIOReturnBadArgument)
+        let first = FakeTransport()
+        let second = FakeTransport()
+        let harness = Harness(connector: FakeConnector([.success(first), .success(second)]))
+        first.feed(statusMessage)
+        first.fail(failure)
+        await harness.arrive(waitingFor: first)
+        #expect(await eventually { second.written.count == 4 })
+
+        second.feed(statusMessage)
+        harness.clock.advance(by: Harness.fastTiming.healthyStretch + 1)
+        // The keep-alive that falls due is written after the tick has checked the stretch.
+        #expect(await eventually { second.written.count == 5 })
+        second.fail(failure)
+        #expect(await eventually { harness.events.events.count(where: isReadFailure) == 2 })
+        await harness.driver.stop()
+    }
+
     @Test("a dongle that takes the handshake and fails every read is one episode, not one per retry")
     func handshakeThenReadFailureLoop() async {
         let failure = DongleError.ioFailure(operation: "read", code: kIOReturnBadArgument)
         let transports = (0..<4).map { _ in FakeTransport() }
-        for transport in transports { transport.fail(failure) }
+        // The real dongle answers the handshake with a status message before the reads start failing.
+        for transport in transports {
+            transport.feed(statusMessage)
+            transport.fail(failure)
+        }
         let harness = Harness(connector: FakeConnector(transports.map { .success($0) }))
         harness.driver.start()
         harness.monitor.send(.arrived)
