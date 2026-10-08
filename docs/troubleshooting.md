@@ -71,6 +71,24 @@ The app and CLI are universal (arm64 and x86_64), but they have not been tested 
 
 Your guitar's black-and-white notes only appear when your Clone Hero **player profile uses the 6-fret guitar instrument**, in songs that include a 6-fret (GHL) chart. Most community charts are 5-fret only and show colored notes; they still play with the default bindings. If a song should have a 6-fret chart but the instrument isn't offered, rescan your songs and check that the chart has a 6-fret part (an `[ExpertGHLGuitar]` section in `notes.chart`, or a `PART GUITAR GHL` track in `notes.mid`). See [Setting up Clone Hero](clone-hero-setup.md#4-6-fret-charts-vs-5-fret-charts).
 
+## Collecting logs
+
+GHLive writes its events to the macOS system log, so a problem you notice days later still leaves evidence. It logs events, never which keys you press: no key, control or guitar report ever reaches the log, and neither does the dongle's serial number. What it records is things like the dongle being plugged in or removed, status changes, connection and USB errors, the guitar going silent, how many keys were released and why, pausing and resuming, Accessibility changes, and starting and quitting.
+
+To read what happened in the last two hours:
+
+```sh
+/usr/bin/log show --last 2h --info --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
+```
+
+To watch it live while you reproduce a problem:
+
+```sh
+/usr/bin/log stream --predicate 'subsystem == "io.github.rodmarzavala.ghlive"'
+```
+
+Add `--last 3d` (or any other span) to `log show` to look further back. The full path `/usr/bin/log` matters: in zsh, a bare `log` is a different, built-in command. `log show` may ask for an administrator account. Read the lines around the time the problem started and paste them into your [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose); remove anything personal first. A `dongle removed` line means macOS saw the dongle disappear (unplugged, lost power or a USB fault), and a read or write failure can come just before or after it. Repeated read or write failures with no removal point at the USB link or the radio between the guitar and the dongle; the log alone cannot tell you which, so include it in your report.
+
 ## Still stuck
 
-Open a [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose). Include your macOS version, chip, app version and, if you can, `ghlive sniff` output (see [CONTRIBUTING](../CONTRIBUTING.md#capturing-a-packet-log)).
+Open a [bug report](https://github.com/rodmarzavala/ghlive-xbox-one-mac/issues/new/choose). Include your macOS version, chip, app version and, if you can, the [log](#collecting-logs) around the problem and `ghlive sniff` output (see [CONTRIBUTING](../CONTRIBUTING.md#capturing-a-packet-log)).

@@ -39,6 +39,12 @@ body:
     validations:
       required: true
   - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: The GHLive system log around the problem, see [Collecting logs](https://github.com/rodmarzavala/ghlive-xbox-one-mac/blob/develop/docs/troubleshooting.md#collecting-logs). It records events only, never your keys. Remove anything personal first.
+      render: text
+  - type: textarea
     id: sniff
     attributes:
       label: "`ghlive sniff` output (optional)"

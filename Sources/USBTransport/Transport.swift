@@ -40,7 +40,7 @@ public protocol DongleEventSource: Sendable {
     func events() -> AsyncStream<DongleEvent>
 }
 
-public enum DongleError: Error, Equatable, LocalizedError, Sendable {
+public enum DongleError: Error, Hashable, LocalizedError, Sendable {
     case notFound
     case exclusiveAccess
     case noGipInterface
